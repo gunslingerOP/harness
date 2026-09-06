@@ -1,16 +1,86 @@
 {
-  "harness": { "version": "0.1.0", "stack": "node" },
-  "repo": { "main_branch": "main", "protected_branches": ["main"], "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci)/", "branch_escape_prefixes": [] },
-  "layout": {
-    "top_dirs": [".claude", ".github", "bin", "lib", "guards", "hooks", "test", "eslint", "templates", "discipline", "agents", "output-styles", "docs"],
-    "root_files": [".gitignore", "README.md", "LICENSE", "package.json", "package-lock.json"],
-    "organized_dirs": [{ "dir": "guards", "max_files": 6, "exempt": [] }, { "dir": "lib", "max_files": 6, "exempt": [] }],
-    "source_extensions": [".js", ".sh"],
-    "test_markers": [".test.", "harness-test"]
+  "harness": {
+    "version": "0.2.0",
+    "stack": "node",
+    "project": "harness"
   },
-  "docs": { "required_for_code": false, "doc_dirs": ["docs/"], "skip_marker": ".claude/.skip-docs" },
-  "session": { "banner_command": "npm test 2>&1 | tail -3" },
-  "safety": { "deny_patterns": ["\\bnpm\\s+publish\\b"] },
-  "deploy": { "protected_stages": [] },
-  "style": {}
+  "repo": {
+    "main_branch": "main",
+    "protected_branches": [
+      "main"
+    ],
+    "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci)/",
+    "branch_escape_prefixes": []
+  },
+  "layout": {
+    "top_dirs": [
+      ".claude",
+      ".github",
+      "bin",
+      "lib",
+      "guards",
+      "hooks",
+      "test",
+      "eslint",
+      "templates",
+      "discipline",
+      "agents",
+      "output-styles",
+      "docs",
+      "adapters",
+      "instructions"
+    ],
+    "root_files": [
+      ".gitignore",
+      "README.md",
+      "LICENSE",
+      "package.json",
+      "package-lock.json"
+    ],
+    "organized_dirs": [
+      {
+        "dir": "guards",
+        "max_files": 6,
+        "exempt": []
+      },
+      {
+        "dir": "lib",
+        "max_files": 6,
+        "exempt": []
+      }
+    ],
+    "source_extensions": [
+      ".js",
+      ".sh"
+    ],
+    "test_markers": [
+      ".test.",
+      "harness-test"
+    ]
+  },
+  "docs": {
+    "required_for_code": false,
+    "doc_dirs": [
+      "docs/"
+    ],
+    "skip_marker": ".claude/.skip-docs"
+  },
+  "session": {
+    "banner_command": "npm test 2>&1 | tail -3"
+  },
+  "safety": {
+    "deny_patterns": [
+      "\\bnpm\\s+publish\\b"
+    ]
+  },
+  "deploy": {
+    "protected_stages": []
+  },
+  "style": {},
+  "telemetry": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:4318",
+    "tool_details": true,
+    "register_dir": "~/.harness/register"
+  }
 }

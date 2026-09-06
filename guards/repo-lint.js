@@ -11,6 +11,8 @@
 //   ASCII names     — non-ASCII filenames break tooling silently
 //   tool artifacts  — .DS_Store, *.orig, editor swap files never get committed
 //   docs with code  — optional: code changes must touch docs, or the skip marker exists
+//
+// reads: layout.top_dirs, layout.root_files, layout.organized_dirs, layout.source_extensions, layout.test_markers, docs.required_for_code, docs.doc_dirs, docs.skip_marker
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');

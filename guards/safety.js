@@ -6,6 +6,8 @@
 // Born from: the general truth that an agent will run `git reset --hard` to "clean up" and a
 // `gh pr create` without --base will ship the wrong branch. Both are one keystroke and neither
 // is recoverable.
+//
+// reads: safety.deny_patterns, repo.protected_branches, deploy.protected_stages
 const { load, HarnessConfigMissing } = require('../lib/config');
 
 /** Denied ALWAYS. Config can add to this list; nothing can remove from it. */

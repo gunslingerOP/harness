@@ -1,20 +1,120 @@
 {
-  "harness": { "version": "0.1.0", "stack": "next" },
-  "repo": { "main_branch": "main", "protected_branches": ["main"], "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci|deps)/", "branch_escape_prefixes": ["dependabot/", "hotfix/"] },
-  "layout": {
-    "top_dirs": [".claude", ".github", ".vscode", "app", "src", "public", "docs", "scripts", "prisma", "drizzle"],
-    "root_files": [".gitignore", ".prettierignore", ".prettierrc.json", ".env.example", "README.md", "CLAUDE.md", "LICENSE", "package.json", "package-lock.json", "tsconfig.json", "eslint.config.js", "next.config.ts", "next.config.js", "next.config.mjs", "postcss.config.js", "tailwind.config.ts", "next-env.d.ts", "vercel.json"],
-    "organized_dirs": [{ "dir": "src", "max_files": 6, "exempt": ["src/app"] }, { "dir": "app", "max_files": 8, "exempt": [] }],
-    "source_extensions": [".ts", ".tsx", ".js", ".jsx"],
-    "test_markers": [".test.", ".spec."]
+  "harness": {
+    "version": "0.2.0",
+    "stack": "next",
+    "project": ""
   },
-  "docs": { "required_for_code": false, "doc_dirs": ["docs/"], "skip_marker": ".claude/.skip-docs" },
-  "session": { "banner_command": "" },
-  "safety": { "deny_patterns": ["\\bprisma\\s+migrate\\s+reset\\b", "\\bdrizzle-kit\\s+drop\\b"] },
-  "deploy": { "protected_stages": ["production", "prod"] },
+  "repo": {
+    "main_branch": "main",
+    "protected_branches": [
+      "main"
+    ],
+    "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci|deps)/",
+    "branch_escape_prefixes": [
+      "dependabot/",
+      "hotfix/"
+    ]
+  },
+  "layout": {
+    "top_dirs": [
+      ".claude",
+      ".github",
+      ".vscode",
+      "app",
+      "src",
+      "public",
+      "docs",
+      "scripts",
+      "prisma",
+      "drizzle"
+    ],
+    "root_files": [
+      ".gitignore",
+      ".prettierignore",
+      ".prettierrc.json",
+      ".env.example",
+      "README.md",
+      "CLAUDE.md",
+      "LICENSE",
+      "package.json",
+      "package-lock.json",
+      "tsconfig.json",
+      "eslint.config.js",
+      "next.config.ts",
+      "next.config.js",
+      "next.config.mjs",
+      "postcss.config.js",
+      "tailwind.config.ts",
+      "next-env.d.ts",
+      "vercel.json"
+    ],
+    "organized_dirs": [
+      {
+        "dir": "src",
+        "max_files": 6,
+        "exempt": [
+          "src/app"
+        ]
+      },
+      {
+        "dir": "app",
+        "max_files": 8,
+        "exempt": []
+      }
+    ],
+    "source_extensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx"
+    ],
+    "test_markers": [
+      ".test.",
+      ".spec."
+    ]
+  },
+  "docs": {
+    "required_for_code": false,
+    "doc_dirs": [
+      "docs/"
+    ],
+    "skip_marker": ".claude/.skip-docs"
+  },
+  "session": {
+    "banner_command": ""
+  },
+  "safety": {
+    "deny_patterns": [
+      "\\bprisma\\s+migrate\\s+reset\\b",
+      "\\bdrizzle-kit\\s+drop\\b"
+    ]
+  },
+  "deploy": {
+    "protected_stages": [
+      "production",
+      "prod"
+    ]
+  },
   "style": {
     "pure": [
-      { "globs": ["src/domain/**/*.ts"], "forbid": ["react", "react-*", "next", "next/*"], "message": "src/domain imports no React/Next. Keep it pure." }
+      {
+        "globs": [
+          "src/domain/**/*.ts"
+        ],
+        "forbid": [
+          "react",
+          "react-*",
+          "next",
+          "next/*"
+        ],
+        "message": "src/domain imports no React/Next. Keep it pure."
+      }
     ]
+  },
+  "telemetry": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:4318",
+    "tool_details": true,
+    "register_dir": "~/.harness/register"
   }
 }

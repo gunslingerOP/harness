@@ -1,0 +1,8 @@
+{
+  "_": "THE BLOAT BUDGET. Every number here is a ceiling a test enforces. Raising one is a deliberate edit in the same PR — that edit is the decision, made out loud.",
+  "guards_max": 6,
+  "guard_max_lines": 220,
+  "cli_max_lines": 320,
+  "config_top_level_keys_max": 9,
+  "dependencies_max": 0
+}

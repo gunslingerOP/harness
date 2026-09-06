@@ -1,0 +1,36 @@
+# The register. One collector, one file. Every agent that speaks OTLP (Claude Code, Codex CLI)
+# points at 127.0.0.1:4318 and this writes what they say, one JSON object per line, rotated.
+# __HOME__ is substituted by `harness install --global`.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+exporters:
+  file:
+    path: __HOME__/.harness/register/otel.jsonl
+    format: json
+    # no `append`: the exporter forbids it alongside rotation, and the rotator already appends
+    # to an existing file below max_megabytes — data survives collector restarts.
+    create_directory: true
+    rotation:
+      max_megabytes: 50
+      max_days: 30
+      max_backups: 12
+      localtime: true
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [file]
+    logs:
+      receivers: [otlp]
+      exporters: [file]
+    traces:
+      receivers: [otlp]
+      exporters: [file]

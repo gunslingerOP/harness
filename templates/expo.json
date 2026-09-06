@@ -1,36 +1,128 @@
 {
-  "harness": { "version": "0.1.0", "stack": "expo" },
+  "harness": {
+    "version": "0.2.0",
+    "stack": "expo",
+    "project": ""
+  },
   "repo": {
     "main_branch": "main",
-    "protected_branches": ["main"],
+    "protected_branches": [
+      "main"
+    ],
     "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci|deps)/",
-    "branch_escape_prefixes": ["dependabot/", "hotfix/"]
+    "branch_escape_prefixes": [
+      "dependabot/",
+      "hotfix/"
+    ]
   },
   "layout": {
-    "top_dirs": [".claude", ".github", ".vscode", "src", "assets", "docs", "scripts", "ios", "android"],
-    "root_files": [
-      ".gitignore", ".prettierignore", ".prettierrc.json", ".mcp.json",
-      "README.md", "CLAUDE.md", "LICENSE",
-      "app.json", "eas.json", "package.json", "package-lock.json",
-      "tsconfig.json", "eslint.config.js", "babel.config.js", "metro.config.js", "expo-env.d.ts"
+    "top_dirs": [
+      ".claude",
+      ".github",
+      ".vscode",
+      "src",
+      "assets",
+      "docs",
+      "scripts",
+      "ios",
+      "android"
     ],
-    "organized_dirs": [{ "dir": "src", "max_files": 6, "exempt": ["src/app"] }],
-    "source_extensions": [".ts", ".tsx", ".js", ".jsx"],
-    "test_markers": [".test.", ".spec."]
+    "root_files": [
+      ".gitignore",
+      ".prettierignore",
+      ".prettierrc.json",
+      ".mcp.json",
+      "README.md",
+      "CLAUDE.md",
+      "LICENSE",
+      "app.json",
+      "eas.json",
+      "package.json",
+      "package-lock.json",
+      "tsconfig.json",
+      "eslint.config.js",
+      "babel.config.js",
+      "metro.config.js",
+      "expo-env.d.ts"
+    ],
+    "organized_dirs": [
+      {
+        "dir": "src",
+        "max_files": 6,
+        "exempt": [
+          "src/app"
+        ]
+      }
+    ],
+    "source_extensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx"
+    ],
+    "test_markers": [
+      ".test.",
+      ".spec."
+    ]
   },
-  "docs": { "required_for_code": false, "doc_dirs": ["docs/"], "skip_marker": ".claude/.skip-docs" },
-  "session": { "banner_command": "" },
-  "safety": { "deny_patterns": [] },
-  "deploy": { "protected_stages": ["production"] },
+  "docs": {
+    "required_for_code": false,
+    "doc_dirs": [
+      "docs/"
+    ],
+    "skip_marker": ".claude/.skip-docs"
+  },
+  "session": {
+    "banner_command": ""
+  },
+  "safety": {
+    "deny_patterns": []
+  },
+  "deploy": {
+    "protected_stages": [
+      "production"
+    ]
+  },
   "style": {
     "literals": {
-      "globs": ["src/**/*.{ts,tsx}"],
-      "allow_files": ["src/components/design/tokens.ts"],
+      "globs": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "allow_files": [
+        "src/components/design/tokens.ts"
+      ],
       "hint": "Use a token from components/design/tokens."
     },
     "pure": [
-      { "globs": ["src/screens/**/*Screen.tsx"], "forbid": ["**/infrastructure/**"], "message": "A *Screen is a pure function of props. Storage belongs in the *Container beside it." },
-      { "globs": ["src/domain/**/*.ts"], "forbid": ["react", "react-*", "react-native*", "expo", "expo-*", "@expo/*"], "message": "src/domain imports no React/Expo/RN. Keep it pure." }
+      {
+        "globs": [
+          "src/screens/**/*Screen.tsx"
+        ],
+        "forbid": [
+          "**/infrastructure/**"
+        ],
+        "message": "A *Screen is a pure function of props. Storage belongs in the *Container beside it."
+      },
+      {
+        "globs": [
+          "src/domain/**/*.ts"
+        ],
+        "forbid": [
+          "react",
+          "react-*",
+          "react-native*",
+          "expo",
+          "expo-*",
+          "@expo/*"
+        ],
+        "message": "src/domain imports no React/Expo/RN. Keep it pure."
+      }
     ]
+  },
+  "telemetry": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:4318",
+    "tool_details": true,
+    "register_dir": "~/.harness/register"
   }
 }
