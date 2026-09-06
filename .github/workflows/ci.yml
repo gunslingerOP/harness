@@ -1,0 +1,39 @@
+# The harness proves itself twice on every push: its own suite, then a fresh init into a fixture
+# project with the suite run THERE. A release that breaks `init` cannot be tagged.
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm test
+
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      # The harness lints itself with its own placement guard.
+      - run: git add -A && node guards/repo-lint.js
+      # Then inits into a fixture project and runs the guards from the consumer's side.
+      - name: init into a fixture project
+        run: |
+          set -e
+          mkdir -p /tmp/fixture/src && cd /tmp/fixture
+          git init -q -b main && git config user.email t@t && git config user.name t
+          npm init -y >/dev/null
+          npm i -D "$GITHUB_WORKSPACE" >/dev/null
+          npx harness init --stack node
+          test -f .claude/harness.config.json
+          grep -q '@gunslinger/harness' .claude/settings.json
+          npx harness test
+          npx harness doctor || true
+          echo 'git push --force' | node node_modules/@gunslinger/harness/guards/safety.js && exit 1 || echo "safety held (exit $?)"

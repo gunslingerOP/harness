@@ -1,0 +1,16 @@
+{
+  "harness": { "version": "0.1.0", "stack": "node" },
+  "repo": { "main_branch": "main", "protected_branches": ["main"], "branch_pattern": "^(feat|fix|chore|docs|refactor|test|ci|deps)/", "branch_escape_prefixes": ["dependabot/", "hotfix/"] },
+  "layout": {
+    "top_dirs": [".claude", ".github", ".vscode", "src", "test", "docs", "scripts", "bin"],
+    "root_files": [".gitignore", ".prettierignore", ".prettierrc.json", ".env.example", "README.md", "CLAUDE.md", "LICENSE", "package.json", "package-lock.json", "tsconfig.json", "eslint.config.js"],
+    "organized_dirs": [{ "dir": "src", "max_files": 6, "exempt": [] }],
+    "source_extensions": [".ts", ".js", ".mjs", ".cjs"],
+    "test_markers": [".test.", ".spec."]
+  },
+  "docs": { "required_for_code": false, "doc_dirs": ["docs/"], "skip_marker": ".claude/.skip-docs" },
+  "session": { "banner_command": "" },
+  "safety": { "deny_patterns": [] },
+  "deploy": { "protected_stages": ["production", "prod"] },
+  "style": {}
+}

@@ -1,0 +1,22 @@
+# A release is a tag. Re-verifies from scratch, then cuts a GitHub Release with generated notes.
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm test
+      - name: the tag must match package.json
+        run: |
+          V="v$(node -p "require('./package.json').version")"
+          [ "$V" = "${{ github.ref_name }}" ] || { echo "tag ${{ github.ref_name }} != package.json $V"; exit 1; }
+      - env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes --verify-tag
