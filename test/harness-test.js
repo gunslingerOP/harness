@@ -321,7 +321,11 @@ test('REGISTER: an old event is outside the window; a torn line is skipped, not 
 test('BANNER: identity first — harness version and project, then git truth', () => {
   const r = repo({ ...CONFIG, harness: { version: '0.2.0', stack: 'node', project: 'fixture-app' } });
   const res = runGuard('banner.js', { cwd: r.root });
-  assert.match(res.stdout.split('\n')[0], /harness 0\.2\.0 · fixture-app · node/, res.stdout);
+  // The version comes from package.json, never a literal: 0.2.1 shipped with this asserting
+  // 0.2.0 because the suite ran before the bump — a test that encodes today's number rots on the
+  // next release.
+  const v = require('../package.json').version.replace(/\./g, '\\.');
+  assert.match(res.stdout.split('\n')[0], new RegExp(`harness ${v} · fixture-app · node`), res.stdout);
   assert.match(res.stdout, /⎇ main/);
   r.rm();
 });
