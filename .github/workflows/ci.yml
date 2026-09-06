@@ -42,7 +42,7 @@ jobs:
           # runner has no collector) — so assert the lines a fresh init MUST produce, not the code.
           npx harness doctor > /tmp/doc.log 2>&1 || true
           cat /tmp/doc.log
-          for want in 'harness.config.json valid' 'project hooks wired' 'telemetry env in project settings' 'AGENTS.md carries the harness section'; do
+          for want in '.claude/harness.config.json valid' 'project hooks wired' 'telemetry env in project settings' 'AGENTS.md carries the harness section'; do
             grep -qF "✓ $want" /tmp/doc.log || { echo "MISSING after init: $want"; exit 1; }
           done
           echo 'git push --force' | node node_modules/@gunslinger/harness/guards/safety.js && exit 1 || echo "safety held (exit $?)"
