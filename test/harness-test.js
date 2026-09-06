@@ -283,15 +283,18 @@ test('DEAD GUARDS: every guard declares the config keys it reads, and every temp
 
 test('REGISTER: parses the collector file-exporter shape and summarises what a retro needs', () => {
   const reg = require('../guards/register');
+  // THE REAL WIRE SHAPE, captured from a live session on 2026-09-07: `event.name` is UNPREFIXED
+  // (`user_prompt`), `body` carries the prefixed form. The first fixture mirrored the docs instead
+  // and the reader silently counted nothing — a test that agrees with its author proves nothing.
   const line = (name, extra) => ({
-    resourceLogs: [{ resource: { attributes: [{ key: 'project', value: { stringValue: 'domybest' } }] }, scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), body: { stringValue: name }, attributes: [{ key: 'event.name', value: { stringValue: name } }, { key: 'session.id', value: { stringValue: 's1' } }, ...Object.entries(extra).map(([k, v]) => ({ key: k, value: typeof v === 'number' ? { intValue: String(v) } : { stringValue: String(v) } }))] }] }] }],
+    resourceLogs: [{ resource: { attributes: [{ key: 'project', value: { stringValue: 'domybest' } }] }, scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), body: { stringValue: `claude_code.${name}` }, attributes: [{ key: 'event.name', value: { stringValue: name } }, { key: 'session.id', value: { stringValue: 's1' } }, ...Object.entries(extra).map(([k, v]) => ({ key: k, value: typeof v === 'number' ? { intValue: String(v) } : { stringValue: String(v) } }))] }] }] }],
   });
   const evs = [
-    ...reg.events(line('claude_code.tool_result', { tool_name: 'Bash', success: 'true', duration_ms: 120 })),
-    ...reg.events(line('claude_code.tool_result', { tool_name: 'Bash', success: 'false', duration_ms: 40 })),
-    ...reg.events(line('claude_code.tool_decision', { tool_name: 'Bash', decision: 'reject', source: 'hook' })),
-    ...reg.events(line('claude_code.api_request', { cost_usd: '0.5', input_tokens: 1000, output_tokens: 200 })),
-    ...reg.events(line('claude_code.api_error', { status_code: 529 })),
+    ...reg.events(line('tool_result', { tool_name: 'Bash', success: 'true', duration_ms: 120 })),
+    ...reg.events(line('tool_result', { tool_name: 'Bash', success: 'false', duration_ms: 40 })),
+    ...reg.events(line('tool_decision', { tool_name: 'Bash', decision: 'reject', source: 'hook' })),
+    ...reg.events(line('api_request', { cost_usd: '0.5', input_tokens: 1000, output_tokens: 200 })),
+    ...reg.events(line('api_error', { status_code: 529 })),
   ];
   const s = reg.summarise(evs, { days: 14 });
   assert.equal(s.sessions, 1);
@@ -308,7 +311,7 @@ test('REGISTER: parses the collector file-exporter shape and summarises what a r
 test('REGISTER: an old event is outside the window; a torn line is skipped, not fatal', () => {
   const reg = require('../guards/register');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-reg-'));
-  const old = { resourceLogs: [{ scopeLogs: [{ logRecords: [{ timeUnixNano: String((Date.now() - 40 * 86400000) * 1e6), attributes: [{ key: 'event.name', value: { stringValue: 'claude_code.user_prompt' } }, { key: 'session.id', value: { stringValue: 'old' } }] }] }] }] };
+  const old = { resourceLogs: [{ scopeLogs: [{ logRecords: [{ timeUnixNano: String((Date.now() - 40 * 86400000) * 1e6), attributes: [{ key: 'event.name', value: { stringValue: 'user_prompt' } }, { key: 'session.id', value: { stringValue: 'old' } }] }] }] }] };
   fs.writeFileSync(path.join(dir, 'otel.jsonl'), `${JSON.stringify(old)}\n{ torn line\n`);
   const s = reg.summarise(reg.load(dir), { days: 14 });
   assert.equal(s.sessions, 0);
@@ -329,4 +332,35 @@ test('PUSH GUARD: fails CLOSED on the floor — deleting or force-pushing main i
   assert.ok(check([{ localRef: '(delete)', localSha: Z, remoteRef: 'refs/heads/main', remoteSha: 'abc' }], null).length, 'delete main');
   assert.equal(check([{ localRef: 'refs/heads/feat', localSha: Z, remoteRef: 'refs/heads/feat', remoteSha: 'abc' }], null).length, 0, 'deleting a feature branch is fine');
   assert.ok(check([{ localRef: 'refs/heads/release', localSha: Z, remoteRef: 'refs/heads/release', remoteSha: 'abc' }], CONFIG).length, 'config-protected branch');
+});
+
+// ───────────────────────── global git hook chain ─────────────────────────
+
+test('GLOBAL HOOKS: with core.hooksPath set, the chain runs the repo\'s own hook and RETURNS', () => {
+  const { NAMES, hookBody } = require('../lib/git-hooks');
+  const hooksDir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-hooks-'));
+  for (const n of NAMES) {
+    fs.writeFileSync(path.join(hooksDir, n), hookBody(n, path.join(HERE, 'guards', 'push-guard.js')));
+    fs.chmodSync(path.join(hooksDir, n), 0o755);
+  }
+  const r = repo();
+  r.git('config', 'core.hooksPath', hooksDir);
+  const marker = path.join(r.root, 'LOCAL-HOOK-RAN');
+  const local = path.join(r.root, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(local, `#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`);
+  fs.chmodSync(local, 0o755);
+  r.stage(r.write('src/x.ts', ''));
+  // The first version of this chain hung forever here. Bound it: a commit must return in 10s.
+  const res = spawnSync('git', ['commit', '-q', '-m', 'chained'], { cwd: r.root, encoding: 'utf8', timeout: 10000 });
+  assert.equal(res.status, 0, `commit did not return cleanly: ${res.stderr} ${res.error ?? ''}`);
+  assert.ok(fs.existsSync(marker), 'the repo\'s own pre-commit hook must still run under the global hooksPath');
+  fs.rmSync(hooksDir, { recursive: true, force: true });
+  r.rm();
+});
+
+test('GLOBAL HOOKS: the chain never execs itself, even if git resolves the local hook to the chain', () => {
+  const { hookBody } = require('../lib/git-hooks');
+  const body = hookBody('pre-commit', '/x/push-guard.js');
+  assert.match(body, /--git-common-dir/, 'must resolve the repo\'s own hooks dir, not core.hooksPath');
+  assert.match(body, /-ef "\$0"/, 'must refuse to exec itself');
 });

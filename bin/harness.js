@@ -139,14 +139,15 @@ function installGlobal() {
   log('copy', '~/.claude/agents/adversarial-reviewer.md · ~/.claude/output-styles/concise.md');
 
   // 4. the safety floor in EVERY repo, including ones you do not own — global git hooks that chain
-  //    to each repo's own hooks so simple-git-hooks / husky keep working.
+  //    to each repo's own hooks so simple-git-hooks / husky keep working. Bodies come from
+  //    lib/git-hooks.js, which the suite tests by committing under a hooksPath — the first version
+  //    resolved the local hook to ITSELF and hung every commit on the machine.
   const hooksDir = path.join(HARNESS_HOME, 'git-hooks');
-  for (const name of ['pre-commit', 'commit-msg', 'prepare-commit-msg', 'pre-push', 'post-checkout', 'post-merge', 'post-commit']) {
-    const local = 'LOCAL="$(git rev-parse --git-path hooks)/' + name + '"; [ -x "$LOCAL" ] && exec "$LOCAL" "$@"';
-    const body = name === 'pre-push'
-      ? `#!/bin/sh\n# harness global pre-push: the safety floor for every repo on this machine, then the repo's own hook.\nnode ${JSON.stringify(path.join(HERE, 'guards', 'push-guard.js'))} "$@" || exit $?\n${local}\nexit 0\n`
-      : `#!/bin/sh\n# harness global ${name}: delegates to the repo's own hook so local setups keep working.\n${local}\nexit 0\n`;
-    const f = path.join(hooksDir, name); fs.writeFileSync(f, body); fs.chmodSync(f, 0o755);
+  const { NAMES, hookBody } = require('../lib/git-hooks');
+  for (const name of NAMES) {
+    const f = path.join(hooksDir, name);
+    fs.writeFileSync(f, hookBody(name, path.join(HERE, 'guards', 'push-guard.js')));
+    fs.chmodSync(f, 0o755);
   }
   sh(`git config --global core.hooksPath "${hooksDir}"`);
   log('wire', 'git config --global core.hooksPath ~/.harness/git-hooks (chains to each repo\'s own hooks)');
@@ -197,7 +198,9 @@ function doctor() {
   const pkgScripts = readJson(path.join(root, 'package.json')).scripts ?? {};
   ok = line(Object.values(pkgScripts).some((s) => /harness lint/.test(s)) || (fs.existsSync(pre) && fs.readFileSync(pre, 'utf8').includes('harness')), 'placement guard reachable from pre-commit') && ok;
   const reg = path.join(HARNESS_HOME, 'register', 'otel.jsonl');
-  const alive = sh('pgrep -f otelcol-contrib').status === 0;
+  // -x: exact process name. `pgrep -f` matched the shell running pgrep itself, so a runner with
+  // no collector reported one — a false positive found by the CI dogfood job.
+  const alive = sh('pgrep -x otelcol-contrib').status === 0;
   line(alive, alive ? 'collector running' : 'collector NOT running — `harness install --global`');
   const fresh = fs.existsSync(reg) && Date.now() - fs.statSync(reg).mtimeMs < 86400000;
   line(fresh, fresh ? `register written in the last 24h (${(fs.statSync(reg).size / 1048576).toFixed(1)} MB)` : 'register stale or empty');

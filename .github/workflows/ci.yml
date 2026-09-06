@@ -38,5 +38,11 @@ jobs:
           # passed on a no-op; now it fails unless node reports passing tests.
           npx harness test 2>&1 | tee /tmp/ht.log
           grep -qE '^# pass [1-9]' /tmp/ht.log
-          npx harness doctor
+          # doctor exits 1 on a bare init by design (pre-commit is wired by the project, and a
+          # runner has no collector) — so assert the lines a fresh init MUST produce, not the code.
+          npx harness doctor > /tmp/doc.log 2>&1 || true
+          cat /tmp/doc.log
+          for want in 'harness.config.json valid' 'project hooks wired' 'telemetry env in project settings' 'AGENTS.md carries the harness section'; do
+            grep -qF "✓ $want" /tmp/doc.log || { echo "MISSING after init: $want"; exit 1; }
+          done
           echo 'git push --force' | node node_modules/@gunslinger/harness/guards/safety.js && exit 1 || echo "safety held (exit $?)"

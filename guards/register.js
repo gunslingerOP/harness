@@ -29,7 +29,12 @@ function* events(obj) {
     for (const sl of rl.scopeLogs ?? []) {
       for (const rec of sl.logRecords ?? []) {
         const a = attrs(rec.attributes);
-        const name = a['event.name'] ?? rec.body?.stringValue ?? rec.eventName ?? '';
+        // ON THE WIRE (verified against a real session, 2026-09-07): Claude Code sets the
+        // `event.name` attribute WITHOUT the `claude_code.` prefix (`user_prompt`) and puts the
+        // prefixed form in `body`. The docs show the prefixed name. Canonicalise to unprefixed —
+        // matching the prefixed form on the attribute made every event fall through to nothing.
+        const raw = a['event.name'] ?? rec.body?.stringValue ?? rec.eventName ?? '';
+        const name = String(raw).replace(/^claude_code\./, '');
         const ts = Number(rec.timeUnixNano ?? rec.observedTimeUnixNano ?? 0) / 1e6;
         yield { name, ts, attrs: a, resource };
       }
@@ -67,7 +72,7 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
       s.byProject[project].add(a['session.id']);
     }
     switch (e.name) {
-      case 'claude_code.tool_result': {
+      case 'tool_result': {
         s.tools.total += 1;
         const t = a.tool_name ?? '?';
         s.tools.byName[t] = (s.tools.byName[t] ?? 0) + 1;
@@ -78,14 +83,14 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
         if (a.duration_ms) s.tools.durations.push(Number(a.duration_ms));
         break;
       }
-      case 'claude_code.tool_decision':
+      case 'tool_decision':
         if (a.decision === 'reject' && a.source === 'hook') {
           s.guard.denied += 1;
           const t = a.tool_name ?? '?';
           s.guard.byTool[t] = (s.guard.byTool[t] ?? 0) + 1;
         }
         break;
-      case 'claude_code.api_request':
+      case 'api_request':
         s.api.requests += 1;
         s.api.cost += Number(a.cost_usd ?? 0);
         s.api.tokens.input += Number(a.input_tokens ?? 0);
@@ -93,10 +98,10 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
         s.api.tokens.cacheRead += Number(a.cache_read_tokens ?? 0);
         s.api.tokens.cacheCreation += Number(a.cache_creation_tokens ?? 0);
         break;
-      case 'claude_code.api_error':
+      case 'api_error':
         s.api.errors += 1;
         break;
-      case 'claude_code.user_prompt':
+      case 'user_prompt':
         s.prompts += 1;
         break;
       default:
