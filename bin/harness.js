@@ -144,7 +144,12 @@ switch (cmd) {
   case 'safety': run('guards/safety.js'); break;
   case 'banner': run('guards/banner.js'); break;
   case 'test': {
-    const r = spawnSync(process.execPath, ['--test', path.join(HERE, 'test', 'harness-test.js')], { stdio: 'inherit', env: { ...process.env, HARNESS_CONSUMER_ROOT: findRoot() } });
+    const suite = path.join(HERE, 'test', 'harness-test.js');
+    // A missing suite must be a loud failure, not a quiet exit 0 — an install that cannot prove
+    // its guards is exactly the install you should not trust. (0.1.0 shipped without test/ in
+    // package.json "files"; every consumer's `harness test` was a no-op.)
+    if (!fs.existsSync(suite)) die(`suite not found at ${suite} — this install is incomplete; reinstall the harness`);
+    const r = spawnSync(process.execPath, ['--test', suite], { stdio: 'inherit', env: { ...process.env, HARNESS_CONSUMER_ROOT: findRoot() } });
     process.exit(r.status ?? 1);
   }
   case 'doctor': doctor(); break;

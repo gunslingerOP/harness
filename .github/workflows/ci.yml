@@ -34,6 +34,9 @@ jobs:
           npx harness init --stack node
           test -f .claude/harness.config.json
           grep -q '@gunslinger/harness' .claude/settings.json
-          npx harness test
-          npx harness doctor || true
+          # The suite must actually RUN in the consumer. 0.1.0 shipped without test/ and this line
+          # passed on a no-op; now it fails unless node reports passing tests.
+          npx harness test 2>&1 | tee /tmp/ht.log
+          grep -qE '^# pass [1-9]' /tmp/ht.log
+          npx harness doctor
           echo 'git push --force' | node node_modules/@gunslinger/harness/guards/safety.js && exit 1 || echo "safety held (exit $?)"
