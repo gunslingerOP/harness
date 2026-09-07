@@ -22,8 +22,18 @@ function attrs(list) {
   return out;
 }
 
-/** Walks one OTLP JSON request and yields flat events: { name, ts, attrs, resource }. */
+/** Walks one OTLP JSON request and yields flat events: { name, ts, attrs, resource }.
+ *  Log records AND spans: with tracing on, tool input/output ride on `claude_code.tool` spans. */
 function* events(obj) {
+  for (const rs of obj.resourceSpans ?? []) {
+    const resource = attrs(rs.resource?.attributes);
+    for (const ss of rs.scopeSpans ?? []) {
+      for (const sp of ss.spans ?? []) {
+        const a = attrs(sp.attributes);
+        yield { name: `span:${String(sp.name ?? '').replace(/^claude_code\./, '')}`, ts: Number(sp.startTimeUnixNano ?? 0) / 1e6, attrs: a, resource, span: true };
+      }
+    }
+  }
   for (const rl of obj.resourceLogs ?? []) {
     const resource = attrs(rl.resource?.attributes);
     for (const sl of rl.scopeLogs ?? []) {
@@ -61,6 +71,20 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
     guard: { denied: 0, byTool: {} },
     api: { requests: 0, errors: 0, cost: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } },
     prompts: 0,
+    byAgent: {},
+  };
+  const agentOf = (a) => {
+    if (a['agent.name']) return a['agent.name'];
+    try {
+      return JSON.parse(a.tool_parameters ?? '{}').subagent_type ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const bump = (agent, field, n = 1) => {
+    if (!agent) return;
+    s.byAgent[agent] = s.byAgent[agent] ?? { requests: 0, cost: 0, tokens: 0, spawned: 0 };
+    s.byAgent[agent][field] += n;
   };
   for (const e of evs) {
     if (e.ts && e.ts < since) continue;
@@ -74,6 +98,7 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
     switch (e.name) {
       case 'tool_result': {
         s.tools.total += 1;
+        if (a.tool_name === 'Agent') bump(agentOf(a), 'spawned');
         const t = a.tool_name ?? '?';
         s.tools.byName[t] = (s.tools.byName[t] ?? 0) + 1;
         if (String(a.success) === 'false') {
@@ -93,6 +118,9 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
       case 'api_request':
         s.api.requests += 1;
         s.api.cost += Number(a.cost_usd ?? 0);
+        bump(agentOf(a), 'requests');
+        bump(agentOf(a), 'cost', Number(a.cost_usd ?? 0));
+        bump(agentOf(a), 'tokens', Number(a.input_tokens ?? 0) + Number(a.output_tokens ?? 0));
         s.api.tokens.input += Number(a.input_tokens ?? 0);
         s.api.tokens.output += Number(a.output_tokens ?? 0);
         s.api.tokens.cacheRead += Number(a.cache_read_tokens ?? 0);
@@ -122,6 +150,7 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
     },
     guard: s.guard,
     api: { ...s.api, cost: Number(s.api.cost.toFixed(2)) },
+    byAgent: Object.fromEntries(Object.entries(s.byAgent).map(([k, v]) => [k, { ...v, cost: Number(v.cost.toFixed(2)) }])),
   };
 }
 
@@ -151,6 +180,7 @@ function render(sum) {
     `  guard denials  ${sum.guard.denied}   ${top(sum.guard.byTool)}`,
     `  api            ${sum.api.requests} requests · ${sum.api.errors} errors · $${sum.api.cost}`,
     `  tokens         in ${sum.api.tokens.input} · out ${sum.api.tokens.output} · cache ${sum.api.tokens.cacheRead}`,
+    `  by agent       ${Object.entries(sum.byAgent).map(([k, v]) => `${k}: ${v.requests} req $${v.cost} (spawned ${v.spawned})`).join(' · ') || '— (no subagents in the window)'}`,
   ].join('\n');
 }
 

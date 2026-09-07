@@ -16,19 +16,38 @@ belonged to.
 
 ## What is in it
 
-From Claude Code alone: `user_prompt`, `tool_result` (name, success, duration), `tool_decision`
-(**every guard denial arrives here as `source=hook`**), `api_request` (cost, tokens), `api_error`,
-`permission_mode_changed`, session counts, lines of code, commits, PRs. Prompt and response text
-are redacted by default and stay that way — `OTEL_LOG_TOOL_DETAILS=1` records tool names and
-commands, which is what a retro needs, and nothing more.
+From Claude Code: `user_prompt` **with the prompt text**, `assistant_response` **with the response
+text**, `tool_result` (name, success, duration, the command), `tool_decision` (**every guard
+denial arrives here as `source=hook`**), `api_request` (cost, tokens, **attributed per agent** —
+`agent.name` on subagent requests), `api_error`, `subagent_completed`, hook executions, MCP
+connections, session counts, lines of code, commits, PRs. With tracing on, `claude_code.tool`
+spans carry **tool input and output** (truncated at 60 KB).
+
+That is the index. **The full record is the transcript Claude Code already writes** to
+`~/.claude/projects/<cwd-slug>/<sessionId>.jsonl` — every message, tool call, result and subagent
+turn, keyed by the same session id. `harness session <id|last>` joins the two.
+
+### Privacy — read this once
+
+The env is machine-wide, so **sessions in client repos record their prompt and response text
+too**, in the same local file. It never leaves this machine, rotates after 30 days, and nothing
+reads it but you. If a client's terms make even local recording a problem, remove
+`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES` and `OTEL_LOG_TOOL_CONTENT` from
+`~/.claude/settings.json` `env` for the duration — the transcripts Claude Code writes on its own
+are unaffected either way.
 
 ## Reading it
 
 ```
-npx harness register            # last 14 days: sessions, failures, guard fires, cost
+npx harness register            # last 14 days: sessions, failures, guard fires, cost, per agent
 npx harness register --days=30 --json
+npx harness session last        # one session in full: prompts, responses, tool calls, results, cost
+npx harness session 1c23e6 --full
 jq 'select(.resourceLogs)' ~/.harness/register/otel.jsonl | ...   # it is just JSON
 ```
+
+Reviewing agentic performance is `harness session`: what was asked, what the agent said, what it
+ran, what came back, what it cost — and which subagent spent what.
 
 `harness retro` folds it in beside the inbox and the incident issues, and — because the register
 knows which guards fired — proposes **retirements** as well as additions.

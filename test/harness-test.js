@@ -368,3 +368,52 @@ test('GLOBAL HOOKS: the chain never execs itself, even if git resolves the local
   assert.match(body, /--git-common-dir/, 'must resolve the repo\'s own hooks dir, not core.hooksPath');
   assert.match(body, /-ef "\$0"/, 'must refuse to exec itself');
 });
+
+// ───────────────────────── text, spans, agents, sessions (v0.2.3) ─────────────────────────
+
+test('REGISTER: a span line parses as an event, so tool input/output on traces is readable', () => {
+  const reg = require('../guards/register');
+  const line = { resourceSpans: [{ resource: { attributes: [] }, scopeSpans: [{ spans: [{ name: 'claude_code.tool', startTimeUnixNano: String(Date.now() * 1e6), attributes: [{ key: 'tool_name', value: { stringValue: 'Bash' } }, { key: 'tool_input', value: { stringValue: '{"command":"ls"}' } }] }] }] }] };
+  const evs = [...reg.events(line)];
+  assert.equal(evs.length, 1);
+  assert.equal(evs[0].name, 'span:tool');
+  assert.equal(evs[0].attrs.tool_input, '{"command":"ls"}');
+});
+
+test('REGISTER: cost and spawns are attributed BY AGENT from what is actually on the wire', () => {
+  const reg = require('../guards/register');
+  const rec = (name, extra) => ({ resourceLogs: [{ resource: { attributes: [] }, scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), attributes: [{ key: 'event.name', value: { stringValue: name } }, { key: 'session.id', value: { stringValue: 's' } }, ...Object.entries(extra).map(([k, v]) => ({ key: k, value: { stringValue: String(v) } }))] }] }] }] });
+  const evs = [
+    ...reg.events(rec('api_request', { cost_usd: '0.40', input_tokens: '100', output_tokens: '50' })),
+    ...reg.events(rec('api_request', { cost_usd: '0.10', input_tokens: '10', output_tokens: '5', 'agent.name': 'general-purpose' })),
+    ...reg.events(rec('tool_result', { tool_name: 'Agent', success: 'true', tool_parameters: '{"subagent_type":"general-purpose"}' })),
+  ];
+  const s = reg.summarise(evs, { days: 1 });
+  assert.equal(s.api.cost, 0.5, 'total is still the total');
+  assert.deepEqual(s.byAgent['general-purpose'], { requests: 1, cost: 0.1, tokens: 15, spawned: 1 });
+  assert.match(reg.render(s), /general-purpose: 1 req \$0\.1 \(spawned 1\)/);
+});
+
+test('SESSION: finds a transcript by id or "last" and reads its turns in order', () => {
+  const ses = require('../lib/session');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-projects-'));
+  const dir = path.join(root, '-Users-x-app');
+  fs.mkdirSync(dir);
+  const lines = [
+    { type: 'user', timestamp: 't1', message: { role: 'user', content: 'build the thing' } },
+    { type: 'assistant', timestamp: 't2', message: { role: 'assistant', content: [{ type: 'text', text: 'On it.' }, { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } }] } },
+    { type: 'user', timestamp: 't3', message: { role: 'user', content: [{ type: 'tool_result', is_error: false, content: [{ type: 'text', text: '# pass 3' }] }] } },
+    { type: 'attachment', anything: true },
+    { type: 'assistant', timestamp: 't4', message: { role: 'assistant', content: [{ type: 'text', text: 'Done: 3 pass.' }] } },
+  ];
+  fs.writeFileSync(path.join(dir, 'abc-123.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n'));
+  const t = ses.find('last', root);
+  assert.equal(t.id, 'abc-123');
+  assert.equal(ses.find('abc', root).id, 'abc-123', 'prefix match');
+  assert.equal(ses.find('nope', root), null);
+  const turns = ses.turns(t.path);
+  assert.deepEqual(turns.map((x) => x.kind), ['prompt', 'response', 'tool', 'result', 'response']);
+  assert.equal(turns[2].name, 'Bash');
+  assert.match(ses.render(t, turns, null), /▶ PROMPT\s+build the thing/);
+  fs.rmSync(root, { recursive: true, force: true });
+});

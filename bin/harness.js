@@ -256,6 +256,18 @@ switch (cmd) {
   case 'safety': run('guards/safety.js'); break;
   case 'banner': run('guards/banner.js'); break;
   case 'register': run('guards/register.js', rest); break;
+  case 'session': {
+    // One session in full: the transcript Claude Code already wrote, joined to the register's
+    // cost / failures / per-agent numbers for that session id.
+    const ses = require('../lib/session');
+    const reg = require('../guards/register');
+    const t = ses.find(rest[0] ?? 'last');
+    if (!t) die(`no transcript for "${rest[0] ?? 'last'}" under ${ses.PROJECTS}`);
+    const evs = reg.load().filter((e) => e.attrs['session.id'] === t.id);
+    const summary = evs.length ? reg.summarise(evs, { days: 3650 }) : null;
+    console.log(ses.render(t, ses.turns(t.path, { maxChars: has('full') ? Infinity : 400 }), summary));
+    break;
+  }
   case 'incident': rest[0] ? record('incident', rest.join(' ')) : die('usage: harness incident "<what happened>"'); break;
   case 'feedback': rest[0] ? record('feedback', rest.join(' ')) : die('usage: harness feedback "<one line>"'); break;
   case 'test': {
@@ -278,7 +290,8 @@ switch (cmd) {
   lint                  placement guard on staged files (pre-commit)             hygiene: fails OFF
   safety                PreToolUse guard, reads the tool call on stdin            safety:  fails CLOSED
   banner                SessionStart: identity, git truth, your status command
-  register [--days=N]   what the register recorded: sessions, failures, guard fires, cost
+  register [--days=N]   what the register recorded: sessions, failures, guard fires, cost, per agent
+  session [id|last]     one session in full — every prompt, response, tool call and result, with its cost (--full: untruncated)
   incident "…"          record a failure a guard should have caught → local inbox + ${REPO} issue
   feedback "…"          record an annoyance → local inbox + issue
   retro                 register + issues + inbox + commits → a proposals prompt (≤3 changes, retirements too)
