@@ -15,10 +15,12 @@ exporters:
     # no `append`: the exporter forbids it alongside rotation, and the rotator already appends
     # to an existing file below max_megabytes — data survives collector restarts.
     create_directory: true
+    # Rotation is by SIZE only — files roll at 50 MB so each stays readable, and nothing is ever
+    # deleted by age or count (max_backups 0 = keep all). Founder decision 2026-09-07: the register
+    # is the memory; retention is a decision to make later, not a default that quietly makes it.
     rotation:
       max_megabytes: 50
-      max_days: 30
-      max_backups: 12
+      max_backups: 0
       localtime: true
 service:
   telemetry:

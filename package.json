@@ -1,6 +1,6 @@
 {
   "name": "@gunslinger/harness",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A personal coding-agent harness. Mechanism only \u2014 every project supplies its policy through one config file.",
   "license": "MIT",
   "author": "Hasan Al-qaysi",

@@ -30,7 +30,7 @@ turn, keyed by the same session id. `harness session <id|last>` joins the two.
 ### Privacy — read this once
 
 The env is machine-wide, so **sessions in client repos record their prompt and response text
-too**, in the same local file. It never leaves this machine, rotates after 30 days, and nothing
+too**, in the same local file. It never leaves this machine, is never deleted by age, and nothing
 reads it but you. If a client's terms make even local recording a problem, remove
 `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES` and `OTEL_LOG_TOOL_CONTENT` from
 `~/.claude/settings.json` `env` for the duration — the transcripts Claude Code writes on its own
@@ -59,8 +59,9 @@ and the session runs normally. `harness doctor` reports collector liveness and r
 
 ## Retention
 
-50 MB per file, 12 backups, 30 days. Old data is deleted, not archived — the retro has already
-read it, and what was worth keeping became a guard, an issue or a LEDGER row.
+**Nothing is deleted.** Files roll at 50 MB so each stays readable; there is no age limit and no
+backup count. The register is the memory — pruning it is a decision to make on purpose, later,
+not a default that makes it for you. Disk math: a heavy day is a few MB.
 
 ## Not local?
 
