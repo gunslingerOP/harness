@@ -124,5 +124,11 @@
     "endpoint": "http://127.0.0.1:4318",
     "tool_details": true,
     "register_dir": "~/.harness/register"
+  },
+  "canvas": {
+    "enabled": false,
+    "prefix": "dev:feedback:",
+    "database": "ExpoSQLiteStorage",
+    "output_dir": ".design-work/feedback"
   }
 }

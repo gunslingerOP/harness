@@ -28,7 +28,8 @@
       "output-styles",
       "docs",
       "adapters",
-      "instructions"
+      "instructions",
+      "canvas"
     ],
     "root_files": [
       ".gitignore",
@@ -45,6 +46,11 @@
       },
       {
         "dir": "lib",
+        "max_files": 6,
+        "exempt": []
+      },
+      {
+        "dir": "canvas",
         "max_files": 6,
         "exempt": []
       }

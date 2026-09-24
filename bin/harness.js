@@ -271,10 +271,16 @@ switch (cmd) {
   case 'incident': rest[0] ? record('incident', rest.join(' ')) : die('usage: harness incident "<what happened>"'); break;
   case 'feedback': rest[0] ? record('feedback', rest.join(' ')) : die('usage: harness feedback "<one line>"'); break;
   case 'test': {
-    const suite = path.join(HERE, 'test', 'harness-test.js');
+    const suite = path.join(HERE, 'test');
     if (!fs.existsSync(suite)) die(`suite not found at ${suite} — this install is incomplete; reinstall the harness`);
-    process.exit(spawnSync(process.execPath, ['--test', suite], { stdio: 'inherit' }).status ?? 1);
+    // Bare `--test`, no path argument, run with cwd set to the package root: Node's directory-mode
+    // discovery only walks a "test/" folder when it does its OWN default search from cwd — passed
+    // as an explicit path argument, `--test <dir>` instead tries to `require()` the directory and
+    // throws EISDIR. `cwd` is what makes this find every file under test/, canvas-test.js included,
+    // regardless of filename pattern.
+    process.exit(spawnSync(process.execPath, ['--test'], { cwd: HERE, stdio: 'inherit' }).status ?? 1);
   }
+  case 'canvas': require('../lib/canvas').run(rest); break;
   case 'doctor': doctor(); break;
   case 'retro': retro(); break;
   case 'review': process.stdout.write(fs.readFileSync(path.join(HERE, 'discipline', 'adversarial-reviewer.md'), 'utf8')); break;
@@ -291,6 +297,7 @@ switch (cmd) {
   safety                PreToolUse guard, reads the tool call on stdin            safety:  fails CLOSED
   banner                SessionStart: identity, git truth, your status command
   register [--days=N]   what the register recorded: sessions, failures, guard fires, cost, per agent
+  canvas pull [--platform ios|android] [--all] [--prefix P] [--db NAME] [--dir DIR]   pull the on-device design-feedback kv rows into DIR/<screen>.jsonl
   session [id|last]     one session in full — every prompt, response, tool call and result, with its cost (--full: untruncated)
   incident "…"          record a failure a guard should have caught → local inbox + ${REPO} issue
   feedback "…"          record an annoyance → local inbox + issue
