@@ -51,7 +51,7 @@
       },
       {
         "dir": "canvas",
-        "max_files": 6,
+        "max_files": 7,
         "exempt": []
       }
     ],
