@@ -250,6 +250,10 @@ test('every guard file states the failure it was born from', () => {
 const BUDGET = require('./budget.json');
 const guardFiles = () => fs.readdirSync(path.join(HERE, 'guards')).filter((f) => f.endsWith('.js'));
 const lines = (f) => fs.readFileSync(f, 'utf8').split('\n').length;
+// Top-level *.json config templates only (expo.json, next.json, node.json, …) — `templates/`
+// also holds `canvas/`, a subdirectory of copy-in-app-source files (route.tsx, a skill, …) that
+// are not stack config templates and must not be walked here.
+const templateFiles = () => fs.readdirSync(path.join(HERE, 'templates')).filter((f) => f.endsWith('.json'));
 
 test('BUDGET: the harness cannot grow past its ceilings without editing budget.json', () => {
   assert.ok(guardFiles().length <= BUDGET.guards_max, `${guardFiles().length} guards > budget ${BUDGET.guards_max}`);
@@ -259,7 +263,7 @@ test('BUDGET: the harness cannot grow past its ceilings without editing budget.j
   }
   const cli = lines(path.join(HERE, 'bin', 'harness.js'));
   assert.ok(cli <= BUDGET.cli_max_lines, `bin/harness.js is ${cli} lines > budget ${BUDGET.cli_max_lines}`);
-  for (const t of fs.readdirSync(path.join(HERE, 'templates'))) {
+  for (const t of templateFiles()) {
     const keys = Object.keys(JSON.parse(fs.readFileSync(path.join(HERE, 'templates', t), 'utf8'))).length;
     assert.ok(keys <= BUDGET.config_top_level_keys_max, `${t} has ${keys} top-level keys > budget`);
   }
@@ -268,7 +272,7 @@ test('BUDGET: the harness cannot grow past its ceilings without editing budget.j
 });
 
 test('DEAD GUARDS: every guard declares the config keys it reads, and every template has them', () => {
-  const templates = fs.readdirSync(path.join(HERE, 'templates')).map((t) => [t, JSON.parse(fs.readFileSync(path.join(HERE, 'templates', t), 'utf8'))]);
+  const templates = templateFiles().map((t) => [t, JSON.parse(fs.readFileSync(path.join(HERE, 'templates', t), 'utf8'))]);
   const getPath = (o, k) => k.split('.').reduce((x, p) => (x && typeof x === 'object' ? x[p] : undefined), o);
   for (const f of guardFiles()) {
     const src = fs.readFileSync(path.join(HERE, 'guards', f), 'utf8');
