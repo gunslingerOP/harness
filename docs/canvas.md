@@ -15,6 +15,9 @@ arrives on a `theme` prop instead of an import from your app's tokens.
 - **`canvas/`** — the RN package. `require('@gunslinger/harness/canvas')` gives you
   `VariantsScreen`, `useFeedbackLayer`, `CommentPin`, `deriveInitial` (the pure pin-replay logic),
   and `defaultTheme` (a concrete fallback so the package renders something with zero app wiring).
+  Types are hand-written in `canvas/index.d.ts` (the package itself is plain CommonJS `.js` with
+  JSDoc-only typedefs, no build step) — keep it in sync with the JSDoc by hand; it is the contract
+  an adopting app's own `tsc` compiles against.
 - **`harness canvas pull`** — the puller. Bundle id from your `app.json`, key prefix from your own
   `.claude/harness.config.json` (or the built-in default), iOS **and** Android.
 - **`templates/canvas/route.tsx`** — a copy-in-app-source route for Expo Router.
@@ -124,6 +127,16 @@ fresh project, with a message that says so — expected, not a bug.
 `exec-out` is the more direct binary-safe transport and is what ships; if a real Android pull ever
 shows truncated or corrupted output, switch to the `shell` + `pull` two-step here before relying on
 Android pulls in production use.
+
+## Testing
+
+`npm test` (run from the package root) — **50 passing, 0 failing**: 19 in `test/canvas-test.js`
+(this package — `canvas/pins.js`'s pure replay logic, `lib/canvas.js`'s config/path/db helpers
+against real fixtures, and the device paths against a real fake `xcrun`/`adb` shell script
+prepended to `PATH`, no mocks), 31 in `test/harness-test.js` (the harness's own guard suite,
+unaffected by `canvas/` beyond the `templates/` walk fix noted in the PR). These are counts as of
+this file's last edit, not a promise — re-run `npm test` rather than trust a number printed here or
+anywhere else (a commit message, a PR body) once the suite has moved.
 
 ## The one open question this does not resolve
 
