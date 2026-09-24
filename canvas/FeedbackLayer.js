@@ -11,9 +11,10 @@
 // never reaches any app's storage — `send` is handed in by the consuming app's own route, and
 // `initial` (that screen's own prior entries) is handed in too, read by the route on mount.
 //
-// Ported from domybest's src/dev/variants/FeedbackLayer.tsx. Token imports are replaced by fields
-// read off the `theme` prop (see canvas/theme.js): color.paper -> theme.surface, color.cardBorder
-// -> theme.surfaceBorder, color.ink -> theme.text, ink('disabledInk') -> theme.mutedText,
+// Ported from an app's own hand-rolled src/dev/variants/FeedbackLayer.tsx (issue #6). Token
+// imports are replaced by fields read off the `theme` prop (see canvas/theme.js): color.paper ->
+// theme.surface, color.cardBorder -> theme.surfaceBorder, color.ink -> theme.text,
+// ink('disabledInk') -> theme.mutedText,
 // font.sans/sansSemi -> theme.fontSans/fontSansSemi, type.caption.size -> theme.captionSize,
 // type.chip.size -> theme.chipSize, space() -> theme.space(), shadow.paper -> theme.shadow,
 // depth[DEFAULT_DEPTH] -> theme.accent. The Hairline import (src/components/layout) is dropped —

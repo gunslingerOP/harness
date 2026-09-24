@@ -56,8 +56,10 @@ app, and it exists because atmosphere is app content, not mechanism.
 1. `npm i -D github:gunslingerOP/harness#<tag>`
 2. Install whatever peer deps you don't already have:
    `react`, `react-native`, `react-native-reanimated`, `react-native-safe-area-context`,
-   `expo-haptics`, `better-sqlite3` (only `better-sqlite3` is needed for the CLI puller, not the
-   in-app package).
+   `expo-haptics`, `expo-router`, `expo-sqlite`, `better-sqlite3` (only `better-sqlite3` is needed
+   for the CLI puller; `expo-router` and `expo-sqlite` are needed by `templates/canvas/route.tsx`,
+   not by the `canvas/` package itself — an Expo Router app already has the former, and the latter
+   backs the kv-store the route writes feedback through).
 3. `npx harness init --stack expo` (idempotent) — writes `canvas.enabled: false` into
    `.claude/harness.config.json` if that key is missing; leaves an already-present config alone.
    Flip `canvas.enabled` to `true` and set `canvas.prefix` / `canvas.database` / `canvas.output_dir`
@@ -85,7 +87,7 @@ harness canvas pull [--platform ios|android] [--all] [--prefix P] [--db NAME] [-
   device} present picks it; both or neither is an error asking for the flag.
 - `--all` — reprint full history (ignores the cursor); appending to the `.jsonl` stays deduped by
   `at` regardless, so `--all` never duplicates a line.
-- `--prefix`, `--db`, `--dir` — default from `.claude/harness.config.json`'s `harness.canvas`
+- `--prefix`, `--db`, `--dir` — default from `.claude/harness.config.json`'s top-level `canvas`
   section, else the built-in defaults above, so the command works with zero config.
 - `SIM_UDID` (iOS) / `ANDROID_SERIAL` (Android) — pin a specific device when more than one is
   present, the way each platform's own tooling does.

@@ -4,7 +4,7 @@
 // `defaultTheme` below is a concrete, sane-looking fallback (so the package renders something on
 // its own, with zero app wiring) — never a value an adopting app should ship with. The real job of
 // this file is the `Theme` typedef: the table an adopting app maps its own design tokens onto.
-// docs/canvas.md carries the same table with DoMyBest's worked mapping as the example.
+// docs/canvas.md carries the same table with a worked example mapping.
 //
 // @typedef {Object} Theme
 // @property {string} accent       - dot fill (active), pin fill, Send/Update label colour

@@ -248,3 +248,88 @@ test('pullAndroidKvStore: run-as failing on the MAIN db file is a hard, actionab
   });
   fs.rmSync(bin, { recursive: true, force: true });
 });
+
+// ═══════════════════════════ lib/canvas.js — canvasConfig against a REAL config file ═══════════════════════════
+// Regression for the fix round on PR #7: canvasConfig() read `config.harness.canvas`, but
+// templates/expo.json (and docs/canvas.md's own JSON snippet) write `canvas` as a TOP-LEVEL key,
+// sibling to `harness` — so every `harness canvas pull` default a project set was silently
+// ignored. This writes a real .claude/harness.config.json in the shape the template actually
+// ships and asserts canvasConfig() reads it back, the way `harness canvas pull` really would.
+
+// Minimal config satisfying lib/config.js's REQUIRED sections, so `load()` accepts it as valid —
+// plus the top-level `canvas` key, exactly as templates/expo.json writes it.
+function validConfigWithCanvas(canvasSection) {
+  return {
+    harness: { version: '0.2.4', stack: 'expo', project: 'p' },
+    repo: { main_branch: 'main', protected_branches: ['main'] },
+    layout: {
+      top_dirs: [],
+      root_files: [],
+      organized_dirs: [],
+      source_extensions: ['.ts'],
+      test_markers: ['.test.'],
+    },
+    safety: { deny_patterns: [] },
+    ...(canvasSection !== undefined ? { canvas: canvasSection } : {}),
+  };
+}
+
+function writeConfig(root, config) {
+  const dir = path.join(root, '.claude');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'harness.config.json'), JSON.stringify(config));
+}
+
+test('canvasConfig: reads the top-level `canvas` key from a real config file (not nested under harness)', () => {
+  const root = tmpDir('canvas-cfg-');
+  const canvasSection = { prefix: 'custom:prefix:', database: 'CustomDb', output_dir: 'custom/dir' };
+  writeConfig(root, validConfigWithCanvas(canvasSection));
+  assert.deepEqual(canvas.canvasConfig({ root }), canvasSection);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('canvasConfig: no `canvas` key in an otherwise-valid config falls back to {}, not an error', () => {
+  const root = tmpDir('canvas-cfg-');
+  writeConfig(root, validConfigWithCanvas(undefined));
+  assert.deepEqual(canvas.canvasConfig({ root }), {});
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('canvasConfig: no config file at all falls back to {}, same as HarnessConfigMissing everywhere else', () => {
+  const root = tmpDir('canvas-cfg-'); // no .claude/harness.config.json written
+  assert.deepEqual(canvas.canvasConfig({ root }), {});
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+// ═══════════════════════════ lib/canvas.js — mergeCanvasKey, `harness init`'s per-key merge ═══════════════════════════
+// Regression for PR #7: `harness init` was a whole-file no-op once .claude/harness.config.json
+// existed — contradicting docs/canvas.md's own claim ("writes canvas.enabled: false … if that key
+// is missing; leaves an already-present config alone"). mergeCanvasKey is the extracted, pure
+// piece of that per-key merge, so it's testable without shelling out to the real CLI (which also
+// registers the project as a consumer via `gh issue` — not something a test should trigger).
+
+test('mergeCanvasKey: adds the template canvas key when the project config lacks one, touching nothing else', () => {
+  const existing = { harness: { stack: 'expo' }, repo: { main_branch: 'main' }, someCustomKey: 'keep-me' };
+  const tpl = { harness: { stack: 'expo' }, canvas: { enabled: false, prefix: 'dev:feedback:' } };
+  const { config, added } = canvas.mergeCanvasKey(existing, tpl);
+  assert.equal(added, true);
+  assert.deepEqual(config.canvas, tpl.canvas);
+  assert.equal(config.someCustomKey, 'keep-me'); // nothing else touched
+  assert.equal(existing.canvas, undefined); // the input object itself is not mutated
+});
+
+test('mergeCanvasKey: an already-present canvas key (even a customized one) is left alone', () => {
+  const existing = { harness: { stack: 'expo' }, canvas: { enabled: true, prefix: 'my:own:prefix:' } };
+  const tpl = { harness: { stack: 'expo' }, canvas: { enabled: false, prefix: 'dev:feedback:' } };
+  const { config, added } = canvas.mergeCanvasKey(existing, tpl);
+  assert.equal(added, false);
+  assert.deepEqual(config, existing); // unchanged, including the customization
+});
+
+test('mergeCanvasKey: a template with no canvas key (next.json, node.json) is a no-op', () => {
+  const existing = { harness: { stack: 'node' } };
+  const tpl = { harness: { stack: 'node' } }; // no canvas section, same as templates/node.json
+  const { config, added } = canvas.mergeCanvasKey(existing, tpl);
+  assert.equal(added, false);
+  assert.deepEqual(config, existing);
+});

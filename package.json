@@ -34,6 +34,8 @@
   "peerDependencies": {
     "better-sqlite3": "*",
     "expo-haptics": "*",
+    "expo-router": "*",
+    "expo-sqlite": "*",
     "react": "*",
     "react-native": "*",
     "react-native-reanimated": "*",
@@ -53,6 +55,12 @@
       "optional": true
     },
     "expo-haptics": {
+      "optional": true
+    },
+    "expo-router": {
+      "optional": true
+    },
+    "expo-sqlite": {
       "optional": true
     },
     "better-sqlite3": {

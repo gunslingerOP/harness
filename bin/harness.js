@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { CONFIG_PATH, load, get, findRoot, HarnessConfigMissing } = require('../lib/config');
+const { mergeCanvasKey } = require('../lib/canvas');
 
 const HERE = path.resolve(__dirname, '..');
 const PKG = require('../package.json');
@@ -55,8 +56,13 @@ function init() {
   if (!fs.existsSync(tpl)) die(`no template for stack "${stack}"`);
 
   const cfgFile = path.join(root, CONFIG_PATH);
-  if (fs.existsSync(cfgFile)) console.log(`keep   ${CONFIG_PATH}`);
-  else { const c = readJson(tpl); c.harness.project = name; writeJson(cfgFile, c); console.log(`write  ${CONFIG_PATH}  (from templates/${stack}.json — EDIT IT: the config is the policy)`); }
+  if (fs.existsSync(cfgFile)) {
+    // Idempotent, but per-key for the one section a later `harness init` can introduce (canvas):
+    // add it if missing, never touch anything else already customized in the project's config.
+    const { config: merged, added } = mergeCanvasKey(readJson(cfgFile), readJson(tpl));
+    if (added) { writeJson(cfgFile, merged); console.log(`update ${CONFIG_PATH}  (added canvas.enabled: false — nothing else touched)`); }
+    else console.log(`keep   ${CONFIG_PATH}`);
+  } else { const c = readJson(tpl); c.harness.project = name; writeJson(cfgFile, c); console.log(`write  ${CONFIG_PATH}  (from templates/${stack}.json — EDIT IT: the config is the policy)`); }
 
   const settingsFile = path.join(root, '.claude', 'settings.json');
   const settings = readJson(settingsFile);

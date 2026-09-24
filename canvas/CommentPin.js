@@ -4,9 +4,10 @@
 // the bottom-left is nearly square, so the shape points at the exact spot the comment was left.
 // Tappable — reopens that comment for editing.
 //
-// Ported from domybest's src/dev/variants/CommentPin.tsx. The one substantive change: every token
-// import (`depth[DEFAULT_DEPTH]`, `color.paper`, `font.mono`, `type.chip.size`, `shadow.paper`) is
-// replaced by a field read off the `theme` prop — see canvas/theme.js for the full contract.
+// Ported from an app's own hand-rolled src/dev/variants/CommentPin.tsx (issue #6). The one
+// substantive change: every token import (`depth[DEFAULT_DEPTH]`, `color.paper`, `font.mono`,
+// `type.chip.size`, `shadow.paper`) is replaced by a field read off the `theme` prop — see
+// canvas/theme.js for the full contract.
 //
 // Plain .js, not .tsx: this package ships no build step, so JSX here is transformed by the
 // CONSUMING app's own Metro/Babel, the same way it already handles every other node_modules

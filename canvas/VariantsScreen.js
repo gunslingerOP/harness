@@ -4,8 +4,9 @@
 // a file (via `harness canvas pull`). Several sketches side by side instead of one at a time,
 // judged where the app's own owner already is instead of over a session's shoulder.
 //
-// Ported from domybest's src/dev/variants/VariantsScreen.tsx, with ONE structural change from the
-// original, both required because atmosphere/backgrounds are app content, not mechanism:
+// Ported from an app's own hand-rolled src/dev/variants/VariantsScreen.tsx (issue #6), with ONE
+// structural change from the original, both required because atmosphere/backgrounds are app
+// content, not mechanism:
 //   - No `registry` import and no `screen`-keyed lookup. This component takes `directions`
 //     directly, already resolved — the consuming app's own registry (which stays app-side, see
 //     docs/canvas.md) does the lookup and passes the array in.

@@ -1,9 +1,9 @@
 'use strict';
 // PIN DERIVATION — pure logic, no React: replay a screen's saved feedback entries into pin state
 // so pins and picks survive a reload instead of vanishing every relaunch. Ported verbatim from
-// domybest's src/dev/variants/pins.ts (mechanism only — nothing app-specific in here to begin
-// with). The one pure file in this package a plain `node:test` can exercise directly — see
-// test/canvas-test.js.
+// an app's own hand-rolled src/dev/variants/pins.ts (issue #6; mechanism only — nothing
+// app-specific in here to begin with). The one pure file in this package a plain `node:test` can
+// exercise directly — see test/canvas-test.js.
 //
 // @typedef {Object} Proportion
 // @property {number} x
