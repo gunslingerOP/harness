@@ -1,7 +1,7 @@
 {
   "name": "@gunslinger/harness",
   "version": "0.2.4",
-  "description": "A personal coding-agent harness. Mechanism only \u2014 every project supplies its policy through one config file.",
+  "description": "A personal coding-agent harness. Mechanism only — every project supplies its policy through one config file.",
   "license": "MIT",
   "author": "Hasan Al-qaysi",
   "repository": "github:gunslingerOP/harness",
@@ -9,7 +9,7 @@
     "harness": "bin/harness.js"
   },
   "scripts": {
-    "test": "node --test test/harness-test.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=22"
@@ -26,8 +26,48 @@
     "test",
     "templates",
     "docs",
+    "canvas",
     "README.md",
     "adapters",
     "instructions"
-  ]
+  ],
+  "peerDependencies": {
+    "better-sqlite3": "*",
+    "expo-haptics": "*",
+    "expo-router": "*",
+    "expo-sqlite": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-reanimated": "*",
+    "react-native-safe-area-context": "*"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    },
+    "react-native-reanimated": {
+      "optional": true
+    },
+    "react-native-safe-area-context": {
+      "optional": true
+    },
+    "expo-haptics": {
+      "optional": true
+    },
+    "expo-router": {
+      "optional": true
+    },
+    "expo-sqlite": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "better-sqlite3": "^13.0.3"
+  }
 }

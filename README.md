@@ -33,6 +33,11 @@ npx harness doctor                                                          # wh
 
 Full steps: [docs/porting.md](docs/porting.md). Zero dependencies. Node ≥ 22.
 
+**`canvas`** — an on-device design-review tool for Expo apps: real, swipeable directions of a
+screen, a comment bubble, and `harness canvas pull` (iOS + Android) to get the feedback off the
+device. Ships with zero app content — every component takes a `theme` prop. Details:
+[docs/canvas.md](docs/canvas.md).
+
 ## Maintaining it
 
 - **A bloat budget, enforced.** `test/budget.json` caps guards, lines per guard, CLI size, config

@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { CONFIG_PATH, load, get, findRoot, HarnessConfigMissing } = require('../lib/config');
+const { mergeCanvasKey } = require('../lib/canvas');
 
 const HERE = path.resolve(__dirname, '..');
 const PKG = require('../package.json');
@@ -55,8 +56,13 @@ function init() {
   if (!fs.existsSync(tpl)) die(`no template for stack "${stack}"`);
 
   const cfgFile = path.join(root, CONFIG_PATH);
-  if (fs.existsSync(cfgFile)) console.log(`keep   ${CONFIG_PATH}`);
-  else { const c = readJson(tpl); c.harness.project = name; writeJson(cfgFile, c); console.log(`write  ${CONFIG_PATH}  (from templates/${stack}.json — EDIT IT: the config is the policy)`); }
+  if (fs.existsSync(cfgFile)) {
+    // Idempotent, but per-key for the one section a later `harness init` can introduce (canvas):
+    // add it if missing, never touch anything else already customized in the project's config.
+    const { config: merged, added } = mergeCanvasKey(readJson(cfgFile), readJson(tpl));
+    if (added) { writeJson(cfgFile, merged); console.log(`update ${CONFIG_PATH}  (added canvas.enabled: false — nothing else touched)`); }
+    else console.log(`keep   ${CONFIG_PATH}`);
+  } else { const c = readJson(tpl); c.harness.project = name; writeJson(cfgFile, c); console.log(`write  ${CONFIG_PATH}  (from templates/${stack}.json — EDIT IT: the config is the policy)`); }
 
   const settingsFile = path.join(root, '.claude', 'settings.json');
   const settings = readJson(settingsFile);
@@ -271,10 +277,16 @@ switch (cmd) {
   case 'incident': rest[0] ? record('incident', rest.join(' ')) : die('usage: harness incident "<what happened>"'); break;
   case 'feedback': rest[0] ? record('feedback', rest.join(' ')) : die('usage: harness feedback "<one line>"'); break;
   case 'test': {
-    const suite = path.join(HERE, 'test', 'harness-test.js');
+    const suite = path.join(HERE, 'test');
     if (!fs.existsSync(suite)) die(`suite not found at ${suite} — this install is incomplete; reinstall the harness`);
-    process.exit(spawnSync(process.execPath, ['--test', suite], { stdio: 'inherit' }).status ?? 1);
+    // Bare `--test`, no path argument, run with cwd set to the package root: Node's directory-mode
+    // discovery only walks a "test/" folder when it does its OWN default search from cwd — passed
+    // as an explicit path argument, `--test <dir>` instead tries to `require()` the directory and
+    // throws EISDIR. `cwd` is what makes this find every file under test/, canvas-test.js included,
+    // regardless of filename pattern.
+    process.exit(spawnSync(process.execPath, ['--test'], { cwd: HERE, stdio: 'inherit' }).status ?? 1);
   }
+  case 'canvas': require('../lib/canvas').run(rest); break;
   case 'doctor': doctor(); break;
   case 'retro': retro(); break;
   case 'review': process.stdout.write(fs.readFileSync(path.join(HERE, 'discipline', 'adversarial-reviewer.md'), 'utf8')); break;
@@ -291,6 +303,7 @@ switch (cmd) {
   safety                PreToolUse guard, reads the tool call on stdin            safety:  fails CLOSED
   banner                SessionStart: identity, git truth, your status command
   register [--days=N]   what the register recorded: sessions, failures, guard fires, cost, per agent
+  canvas pull [--platform ios|android] [--all] [--prefix P] [--db NAME] [--dir DIR]   pull the on-device design-feedback kv rows into DIR/<screen>.jsonl
   session [id|last]     one session in full — every prompt, response, tool call and result, with its cost (--full: untruncated)
   incident "…"          record a failure a guard should have caught → local inbox + ${REPO} issue
   feedback "…"          record an annoyance → local inbox + issue
