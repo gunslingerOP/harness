@@ -568,6 +568,20 @@ test('GROUND: a grounded claim passes; a fabricated quote, a missing file, and a
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('GROUND: an empty plan is a FAILURE, not a silent pass — {claims: []} and a plan with neither claims nor evidence both exit 1', () => {
+  const { ground } = require('../lib/ground');
+  const r1 = ground({ claims: [] }, { root: process.cwd() });
+  assert.ok(r1.failures.some((f) => f.includes('ground: FAIL') && f.includes('no claims')), r1.failures.join('\n'));
+  const r2 = ground({}, { root: process.cwd() });
+  assert.ok(r2.failures.some((f) => f.includes('ground: FAIL') && f.includes('no claims')), r2.failures.join('\n'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  fs.writeFileSync(path.join(dir, 'empty.json'), JSON.stringify({ claims: [] }));
+  const res = spawnSync(process.execPath, [path.join(HERE, 'lib', 'ground.js'), path.join(dir, 'empty.json'), '--root', dir], { encoding: 'utf8' });
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.match(res.stdout, /ground: FAIL — no claims/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('GROUND: the line tolerance is exactly 3 — within it passes, one past it fails', () => {
   const { ground } = require('../lib/ground');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
