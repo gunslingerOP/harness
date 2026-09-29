@@ -610,6 +610,19 @@ test('GROUND: the simple-plan shape (top-level evidence[], no claims[]) is accep
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('GROUND: a CRLF file still grounds a multi-line quote — content and quote are both newline-normalised before matching', () => {
+  const { ground, matchLines } = require('../lib/ground');
+  // Written with explicit \r\n so this test does not depend on git's own line-ending handling.
+  assert.deepEqual(matchLines('line one\r\nconst x = 42;\r\nline three\r\n', 'line one\nconst x = 42;'), [1], 'a bare unit check of the normaliser itself');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  fs.writeFileSync(path.join(dir, 'crlf.js'), 'line one\r\nconst x = 42;\r\nline three\r\n');
+  const plan = { claims: [{ claim: 'two-line quote in a CRLF file', evidence: [{ file: 'crlf.js', quote: 'line one\nconst x = 42;' }] }] };
+  const r = ground(plan, { root: dir });
+  assert.equal(r.grounded, 1, r.failures.join('\n'));
+  assert.equal(r.failed, 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('GROUND: as the CLI runs it — exit 0 when every claim grounds, exit 1 with FAIL lines otherwise', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
   fs.writeFileSync(path.join(dir, 'a.js'), 'const ok = true;\n');
