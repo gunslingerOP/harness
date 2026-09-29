@@ -27,6 +27,30 @@ That is the index. **The full record is the transcript Claude Code already write
 `~/.claude/projects/<cwd-slug>/<sessionId>.jsonl` — every message, tool call, result and subagent
 turn, keyed by the same session id. `harness session <id|last>` joins the two.
 
+## Attribution — which project a session belongs to
+
+`OTEL_RESOURCE_ATTRIBUTES=project=<name>` only tags sessions that started after `harness init` ran
+in that exact directory. Everything older, and anything run in a repo the harness was only
+`install --global`-ed into, has no `project` resource attribute — and `by project:` used to just
+call all of it `(unknown)`.
+
+`harness register` now resolves a project in this order, for every event:
+
+1. **The OTel resource attribute** `harness init` writes — always wins when present.
+2. **A literal `project` log attribute**, if some other emitter sets one that way.
+3. **Transcript-derived** — `lib/session.js` maps the session id to its transcript under
+   `~/.claude/projects/<cwd-slug>/<sessionId>.jsonl` and turns the slug back into a label (home
+   directory prefix stripped, a nested `.claude/worktrees/*` segment collapsed onto its parent, so
+   every worktree of one project rolls up together). Slugification replaces every non-alphanumeric
+   character with `-`, one for one — which makes it **lossy**: a literal `-` inside a real
+   directory name is indistinguishable from a path separator. This label is good enough to GROUP
+   sessions by project; treat it as a label, not a reconstructed path.
+4. **`(unknown)`** — only when neither of the above resolves anything (no resource tag, and no
+   transcript on this machine for that session id).
+
+`--project <name>` scopes register's entire output to one project — not just the session count,
+every number (tools, cost, failures, rework) — using the same precedence.
+
 ### Privacy — read this once
 
 The env is machine-wide, so **sessions in client repos record their prompt and response text
@@ -39,8 +63,9 @@ are unaffected either way.
 ## Reading it
 
 ```
-npx harness register            # last 14 days: sessions, failures, guard fires, cost, per agent
-npx harness register --days=30 --json
+npx harness register                        # last 14 days: sessions, cost, rework, per project
+npx harness register --days 30 --json
+npx harness register --project domybest     # the whole output, scoped to one project
 npx harness session last        # one session in full: prompts, responses, tool calls, results, cost
 npx harness session 1c23e6 --full
 jq 'select(.resourceLogs)' ~/.harness/register/otel.jsonl | ...   # it is just JSON
@@ -51,6 +76,34 @@ ran, what came back, what it cost — and which subagent spent what.
 
 `harness retro` folds it in beside the inbox and the incident issues, and — because the register
 knows which guards fired — proposes **retirements** as well as additions.
+
+## Rework signal
+
+Below the summary, `harness register` prints one more line:
+
+```
+rework         sessions with >=2 review rounds: 3   review spawns per executor spawn: 1.4
+```
+
+**What it measures:** Agent-tool spawns in the window, grouped by session, classified by NAME
+PATTERN — not a hardcoded list, since agent names are a project's policy and the harness is
+mechanism. "review" matches any spawned agent type containing "review" (the harness's own shipped
+agent is `adversarial-reviewer`); "executor" matches any type containing "executor" (a common
+convention, not a requirement — see `lib/rework.js`). A session with two or more review-like
+spawns counts toward `sessions with >=2 review rounds`.
+
+**What it cannot measure:** whether those review spawns were rounds on the SAME piece of work, or
+several unrelated reviews in one session — both look identical to this signal. It is a workload
+ratio ("how much review relative to how much execution"), not a rounds-per-ticket count.
+
+**Investigated, not wired:** some workflows (the Workflow tool, not the Agent tool) label their own
+journal entries with a round number per subject — a real rounds-per-ticket signal where it applies,
+found in `<sessionId>/subagents/workflows/*/journal.jsonl`. It is one skill's labeling convention,
+not a contract every workflow honours, so the generic harness does not depend on it; a project that
+wants it can read its own journals with `lib/session.js#transcripts`.
+
+`harness retro` folds the same numbers into its prompt, so a retro proposing a fix for "too much
+back-and-forth" has a number to point at.
 
 ## Failure mode
 

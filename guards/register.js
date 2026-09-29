@@ -1,6 +1,7 @@
 'use strict';
 // THE REGISTER READER. Everything the collector wrote — OTLP JSON, one request per line — turned
-// into the few numbers a retro needs: sessions, cost, tool failures, guard fires, API errors.
+// into the few numbers a retro needs: sessions (attributed per project — precedence in
+// docs/register.md), cost, tool failures, guard fires, API errors, a rework signal.
 // HYGIENE: fails OFF — no register means an empty summary and a hint, never a crash.
 //
 // Born from: a harness whose only memory was a hand-written inbox. A guard nobody can see firing
@@ -9,6 +10,7 @@
 // reads: telemetry.register_dir
 const fs = require('node:fs');
 const path = require('node:path');
+const { agentType } = require('../lib/rework');
 
 const DEFAULT_DIR = path.join(process.env.HOME ?? '', '.harness', 'register');
 
@@ -60,8 +62,18 @@ function readFiles(dir) {
     .map((f) => path.join(dir, f));
 }
 
+/** PRECEDENCE: the OTel resource attribute `harness init` writes wins; a literal `project` log
+ *  attribute next; then the label `lib/session.js#projectIndex` derives from the session's own
+ *  transcript path (covers sessions older than `init`, or run before the env var existed);
+ *  `(unknown)` only when none of those exist. `sessionProjects` is passed in, not read here, so
+ *  this stays pure and testable. */
+function projectOf(e, sessionProjects = new Map()) {
+  const a = e.attrs;
+  return e.resource.project ?? a['project'] ?? (a['session.id'] && sessionProjects.get(a['session.id'])) ?? '(unknown)';
+}
+
 /** Summarise the register since `days` ago. Pure over the parsed events, so tests can feed it. */
-function summarise(evs, { days = 14, now = Date.now() } = {}) {
+function summarise(evs, { days = 14, now = Date.now(), sessionProjects = new Map() } = {}) {
   const since = now - days * 86400000;
   const s = {
     days,
@@ -73,14 +85,6 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
     prompts: 0,
     byAgent: {},
   };
-  const agentOf = (a) => {
-    if (a['agent.name']) return a['agent.name'];
-    try {
-      return JSON.parse(a.tool_parameters ?? '{}').subagent_type ?? null;
-    } catch {
-      return null;
-    }
-  };
   const bump = (agent, field, n = 1) => {
     if (!agent) return;
     s.byAgent[agent] = s.byAgent[agent] ?? { requests: 0, cost: 0, tokens: 0, spawned: 0 };
@@ -89,7 +93,7 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
   for (const e of evs) {
     if (e.ts && e.ts < since) continue;
     const a = e.attrs;
-    const project = e.resource.project ?? a['project'] ?? '(unknown)';
+    const project = projectOf(e, sessionProjects);
     if (a['session.id']) {
       s.sessions.add(a['session.id']);
       s.byProject[project] = s.byProject[project] ?? new Set();
@@ -98,7 +102,7 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
     switch (e.name) {
       case 'tool_result': {
         s.tools.total += 1;
-        if (a.tool_name === 'Agent') bump(agentOf(a), 'spawned');
+        if (a.tool_name === 'Agent') bump(agentType(a), 'spawned');
         const t = a.tool_name ?? '?';
         s.tools.byName[t] = (s.tools.byName[t] ?? 0) + 1;
         if (String(a.success) === 'false') {
@@ -118,9 +122,9 @@ function summarise(evs, { days = 14, now = Date.now() } = {}) {
       case 'api_request':
         s.api.requests += 1;
         s.api.cost += Number(a.cost_usd ?? 0);
-        bump(agentOf(a), 'requests');
-        bump(agentOf(a), 'cost', Number(a.cost_usd ?? 0));
-        bump(agentOf(a), 'tokens', Number(a.input_tokens ?? 0) + Number(a.output_tokens ?? 0));
+        bump(agentType(a), 'requests');
+        bump(agentType(a), 'cost', Number(a.cost_usd ?? 0));
+        bump(agentType(a), 'tokens', Number(a.input_tokens ?? 0) + Number(a.output_tokens ?? 0));
         s.api.tokens.input += Number(a.input_tokens ?? 0);
         s.api.tokens.output += Number(a.output_tokens ?? 0);
         s.api.tokens.cacheRead += Number(a.cache_read_tokens ?? 0);
@@ -169,6 +173,22 @@ function load(dir = DEFAULT_DIR) {
   return out;
 }
 
+/** What `--project` filters on. Pure so the CLI and the tests call the same code. */
+function filterByProject(evs, project, sessionProjects = new Map()) {
+  return project ? evs.filter((e) => projectOf(e, sessionProjects) === project) : evs;
+}
+
+/** `--days=30`/`--days 30`/`--project X` — pure over argv, so a test can hand it any slice. */
+function parseArgs(argv) {
+  const val = (name) => {
+    const eq = argv.find((a) => a.startsWith(`--${name}=`));
+    if (eq) return eq.slice(name.length + 3);
+    const i = argv.indexOf(`--${name}`);
+    return i === -1 ? undefined : argv[i + 1];
+  };
+  return { days: Number(val('days') ?? 14), project: val('project'), json: argv.includes('--json') };
+}
+
 function render(sum) {
   const top = (o, n = 5) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} ${v}`).join(' · ') || '—';
   return [
@@ -186,15 +206,19 @@ function render(sum) {
 
 function main() {
   const dir = process.env.HARNESS_REGISTER_DIR ?? DEFAULT_DIR;
-  const days = Number(process.argv.find((a) => a.startsWith('--days='))?.slice(7) ?? 14);
-  const evs = load(dir);
-  if (!evs.length) {
+  const { days, project, json } = parseArgs(process.argv.slice(2));
+  const all = load(dir);
+  if (!all.length) {
     console.log(`register: nothing in ${dir} — is the collector running? (\`harness doctor\`)`);
     return;
   }
-  const sum = summarise(evs, { days });
-  console.log(process.argv.includes('--json') ? JSON.stringify(sum, null, 2) : render(sum));
+  const sessionProjects = require('../lib/session').projectIndex();
+  const evs = filterByProject(all, project, sessionProjects);
+  const sum = summarise(evs, { days, sessionProjects });
+  const rework = require('../lib/rework');
+  const rw = rework.compute(evs, { days });
+  console.log(json ? JSON.stringify({ ...sum, rework: rw }, null, 2) : `${render(sum)}\n${rework.render(rw)}`);
 }
 
-module.exports = { attrs, events, summarise, load, render, DEFAULT_DIR };
+module.exports = { attrs, events, summarise, load, render, projectOf, filterByProject, parseArgs, DEFAULT_DIR };
 if (require.main === module) main();
