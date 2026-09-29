@@ -559,3 +559,25 @@ test('GROUND: as the CLI runs it — exit 0 when every claim grounds, exit 1 wit
   assert.match(bad.stdout, /FAIL/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('GROUND: evidence[].file cannot escape --root — a "../" traversal and an absolute path both fail as ungrounded, not silently read', () => {
+  const { ground } = require('../lib/ground');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  const root = path.join(dir, 'root');
+  const outside = path.join(dir, 'outside');
+  fs.mkdirSync(root);
+  fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'the secret');
+  const plan = {
+    claims: [
+      { claim: 'traversal', evidence: [{ file: '../outside/secret.txt', quote: 'the secret' }] },
+      { claim: 'absolute', evidence: [{ file: path.join(outside, 'secret.txt'), quote: 'the secret' }] },
+    ],
+  };
+  const r = ground(plan, { root });
+  assert.equal(r.grounded, 0, 'neither claim may ground by escaping --root');
+  assert.equal(r.failed, 2);
+  assert.ok(r.failures.some((f) => f.includes('traversal') && /root/i.test(f)), r.failures.join('\n'));
+  assert.ok(r.failures.some((f) => f.includes('absolute') && /root/i.test(f)), r.failures.join('\n'));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
