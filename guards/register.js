@@ -11,6 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { agentType } = require('../lib/rework');
+const { projectOf, filterByProject, parseArgs } = require('../lib/register-args');
 
 const DEFAULT_DIR = path.join(process.env.HOME ?? '', '.harness', 'register');
 
@@ -60,16 +61,6 @@ function readFiles(dir) {
     .readdirSync(dir)
     .filter((f) => f.startsWith('otel') && f.includes('.jsonl'))
     .map((f) => path.join(dir, f));
-}
-
-/** PRECEDENCE: the OTel resource attribute `harness init` writes wins; a literal `project` log
- *  attribute next; then the label `lib/session.js#projectIndex` derives from the session's own
- *  transcript path (covers sessions older than `init`, or run before the env var existed);
- *  `(unknown)` only when none of those exist. `sessionProjects` is passed in, not read here, so
- *  this stays pure and testable. */
-function projectOf(e, sessionProjects = new Map()) {
-  const a = e.attrs;
-  return e.resource.project ?? a['project'] ?? (a['session.id'] && sessionProjects.get(a['session.id'])) ?? '(unknown)';
 }
 
 /** Summarise the register since `days` ago. Pure over the parsed events, so tests can feed it. */
@@ -171,22 +162,6 @@ function load(dir = DEFAULT_DIR) {
     }
   }
   return out;
-}
-
-/** What `--project` filters on. Pure so the CLI and the tests call the same code. */
-function filterByProject(evs, project, sessionProjects = new Map()) {
-  return project ? evs.filter((e) => projectOf(e, sessionProjects) === project) : evs;
-}
-
-/** `--days=30`/`--days 30`/`--project X` — pure over argv, so a test can hand it any slice. */
-function parseArgs(argv) {
-  const val = (name) => {
-    const eq = argv.find((a) => a.startsWith(`--${name}=`));
-    if (eq) return eq.slice(name.length + 3);
-    const i = argv.indexOf(`--${name}`);
-    return i === -1 ? undefined : argv[i + 1];
-  };
-  return { days: Number(val('days') ?? 14), project: val('project'), json: argv.includes('--json') };
 }
 
 function render(sum) {
