@@ -536,6 +536,14 @@ test('REWORK: classifies Agent spawns by NAME PATTERN (not a hardcoded list) and
   assert.match(rw.render(r), /sessions with >=2 review rounds: 1/);
 });
 
+test('REWORK: "verif" in an agent name classifies as review-like too — verifier and adversarial-reviewer both review, general-purpose is neither', () => {
+  const rw = require('../lib/rework');
+  assert.equal(rw.classify('verifier').review, true);
+  assert.equal(rw.classify('adversarial-reviewer').review, true);
+  assert.equal(rw.classify('general-purpose').review, false);
+  assert.equal(rw.classify('general-purpose').executor, false);
+});
+
 test('REWORK: an empty window renders plainly, with no divide-by-zero', () => {
   const rw = require('../lib/rework');
   const r = rw.compute([], { days: 14 });

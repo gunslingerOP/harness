@@ -87,10 +87,17 @@ rework         sessions with >=2 review rounds: 3   review spawns per executor s
 
 **What it measures:** Agent-tool spawns in the window, grouped by session, classified by NAME
 PATTERN — not a hardcoded list, since agent names are a project's policy and the harness is
-mechanism. "review" matches any spawned agent type containing "review" (the harness's own shipped
-agent is `adversarial-reviewer`); "executor" matches any type containing "executor" (a common
+mechanism. "review" matches any spawned agent type containing **"review" OR "verif"** (the
+harness's own shipped agent is `adversarial-reviewer`; a project's verification agent is typically
+`verifier` or `<something>-verifier`); "executor" matches any type containing "executor" (a common
 convention, not a requirement — see `lib/rework.js`). A session with two or more review-like
 spawns counts toward `sessions with >=2 review rounds`.
+
+**Blind spot in the pattern itself:** a spawn whose name matches NEITHER pattern (e.g.
+`general-purpose`) still counts toward `sessionsWithSpawns` and that session's own spawn total —
+just toward neither `review` nor `executor`, so it cannot move `reviewSpawns`, `executorSpawns`, or
+the ratio between them. This is a naming-convention signal, not a semantic one: rename an agent so
+its type happens to contain one of these substrings and which bucket it falls into changes with it.
 
 **What it cannot measure:** whether those review spawns were rounds on the SAME piece of work, or
 several unrelated reviews in one session — both look identical to this signal. It is a workload
