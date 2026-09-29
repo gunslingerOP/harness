@@ -51,12 +51,16 @@ counts something meaningful.
 
 ## Output
 
-One line per failing claim, naming the file and the quote that did not check out, then a summary:
+One line per failing claim, naming the file and the quote that did not check out, then a summary.
+Real output, from a plan with three claims — two grounded, and this one, where the code never
+actually grew the `persistTimerState(ctx)` call the plan assumed:
 
 ```
-ground: FAIL — "the timer persists across an app restart" — src/domain/timer/machine.ts: quote not found in src/domain/timer/machine.ts: "persistTimerState(ctx)"
+ground: FAIL — "the timer persists across an app restart" — quote not found in src/domain/timer/machine.ts: "persistTimerState(ctx)"
 ground: 3 claims, 2 grounded, 1 failed
 ```
+
+The file path is named once, inside the reason — not repeated before it.
 
 Exit code **1** if anything failed, **0** if every claim grounded. Nothing is printed to stderr —
 this is meant to be read, and grepped (`grep FAIL`), from stdout.
