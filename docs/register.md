@@ -65,7 +65,7 @@ are unaffected either way.
 ```
 npx harness register                        # last 14 days: sessions, cost, rework, per project
 npx harness register --days 30 --json
-npx harness register --project domybest     # the whole output, scoped to one project
+npx harness register --project myapp        # the whole output, scoped to one project
 npx harness session last        # one session in full: prompts, responses, tool calls, results, cost
 npx harness session 1c23e6 --full
 jq 'select(.resourceLogs)' ~/.harness/register/otel.jsonl | ...   # it is just JSON

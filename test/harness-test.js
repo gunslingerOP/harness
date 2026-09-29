@@ -475,7 +475,7 @@ test('REGISTER: filterByProject shares projectOf\'s precedence, so --project sco
 test('REGISTER: parseArgs reads --days and --project in both "--k=v" and "--k v" form', () => {
   const reg = require('../guards/register');
   assert.deepEqual(reg.parseArgs(['--days=30']), { days: 30, project: undefined, json: false });
-  assert.deepEqual(reg.parseArgs(['--days', '7', '--project', 'domybest']), { days: 7, project: 'domybest', json: false });
+  assert.deepEqual(reg.parseArgs(['--days', '7', '--project', 'myapp']), { days: 7, project: 'myapp', json: false });
   assert.deepEqual(reg.parseArgs([]), { days: 14, project: undefined, json: false });
   assert.equal(reg.parseArgs(['--json']).json, true);
 });
