@@ -216,8 +216,10 @@ function retro() {
   const root = findRoot();
   const inbox = path.join(root, 'docs', 'harness-feedback.md');
   const reg = require('../guards/register');
+  const rework = require('../lib/rework');
   const evs = reg.load();
-  const summary = evs.length ? reg.render(reg.summarise(evs, { days: 14 })) : '(register empty — collector not running?)';
+  const sessionProjects = evs.length ? require('../lib/session').projectIndex() : new Map();
+  const summary = evs.length ? `${reg.render(reg.summarise(evs, { days: 14, sessionProjects }))}\n${rework.render(rework.compute(evs, { days: 14 }))}` : '(register empty — collector not running?)';
   const issues = ghOk() ? sh(`gh issue list --repo ${REPO} --label incident,feedback --state open --json number,title,labels --jq '.[] | "#\\(.number) [\\(.labels[0].name)] \\(.title)"'`).stdout : '(gh unavailable)';
   const commits = sh('git log --since="14 days" --format="%h %s" -- .claude scripts .github', { cwd: root }).stdout;
   const guards = fs.readdirSync(path.join(HERE, 'guards')).map((f) => f.replace('.js', ''));
@@ -256,6 +258,7 @@ switch (cmd) {
   case 'safety': run('guards/safety.js'); break;
   case 'banner': run('guards/banner.js'); break;
   case 'register': run('guards/register.js', rest); break;
+  case 'ground': rest[0] ? run('lib/ground.js', rest) : die('usage: harness ground <plan.json> [--root <dir>]'); break;
   case 'session': {
     // One session in full: the transcript Claude Code already wrote, joined to the register's
     // cost / failures / per-agent numbers for that session id.
@@ -290,8 +293,9 @@ switch (cmd) {
   lint                  placement guard on staged files (pre-commit)             hygiene: fails OFF
   safety                PreToolUse guard, reads the tool call on stdin            safety:  fails CLOSED
   banner                SessionStart: identity, git truth, your status command
-  register [--days=N]   what the register recorded: sessions, failures, guard fires, cost, per agent
+  register [--days N] [--project X]   sessions, cost, rework — project: resource tag > transcript > (unknown)
   session [id|last]     one session in full — every prompt, response, tool call and result, with its cost (--full: untruncated)
+  ground <plan.json> [--root dir]     every claims[].evidence[].quote is verbatim in its file — exit 1 on a fabricated citation
   incident "…"          record a failure a guard should have caught → local inbox + ${REPO} issue
   feedback "…"          record an annoyance → local inbox + issue
   retro                 register + issues + inbox + commits → a proposals prompt (≤3 changes, retirements too)

@@ -417,3 +417,145 @@ test('SESSION: finds a transcript by id or "last" and reads its turns in order',
   assert.match(ses.render(t, turns, null), /▶ PROMPT\s+build the thing/);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+// ───────────────────────── attribution, rework, ground (v0.2.5) ─────────────────────────
+
+test('SESSION: projectFromSlug derives a best-effort label — home-prefix stripped, worktrees rolled up, never empty', () => {
+  const ses = require('../lib/session');
+  assert.equal(ses.projectFromSlug('-Users-x-app', '/Users/x'), 'app');
+  assert.equal(ses.projectFromSlug('-Users-x-work-widgets', '/Users/x'), 'work-widgets', 'a literal "-" in a path segment cannot be told apart from a separator — this is a label, not a path');
+  assert.equal(ses.projectFromSlug('-Users-x-app--claude-worktrees-fix-1', '/Users/x'), 'app', 'a .claude/worktrees/* session rolls up to its parent project');
+  assert.equal(ses.projectFromSlug('-Users-x', '/Users/x'), '(home)', 'a session run in $HOME itself gets a stable placeholder, never empty');
+});
+
+test('SESSION: projectIndex maps every transcript id under root to its derived project label', () => {
+  const ses = require('../lib/session');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-projects-'));
+  fs.mkdirSync(path.join(root, '-Users-x-app'));
+  fs.writeFileSync(path.join(root, '-Users-x-app', 'id1.jsonl'), '');
+  fs.mkdirSync(path.join(root, '-Users-x-app--claude-worktrees-fix-1'));
+  fs.writeFileSync(path.join(root, '-Users-x-app--claude-worktrees-fix-1', 'id2.jsonl'), '');
+  const idx = ses.projectIndex(root, '/Users/x');
+  assert.equal(idx.get('id1'), 'app');
+  assert.equal(idx.get('id2'), 'app', 'the worktree session rolls up to the same label as its parent');
+  assert.equal(idx.get('missing'), undefined);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('REGISTER: attribution PRECEDENCE — resource attribute wins, transcript-derived second, (unknown) only when neither exists', () => {
+  const reg = require('../guards/register');
+  const rec = (sid, resourceProject) => ({
+    resourceLogs: [{
+      resource: { attributes: resourceProject ? [{ key: 'project', value: { stringValue: resourceProject } }] : [] },
+      scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), attributes: [{ key: 'event.name', value: { stringValue: 'user_prompt' } }, { key: 'session.id', value: { stringValue: sid } }] }] }],
+    }],
+  });
+  const evs = [...reg.events(rec('s1', 'tagged-proj')), ...reg.events(rec('s2')), ...reg.events(rec('s3'))];
+  const sessionProjects = new Map([['s2', 'derived-proj']]); // s3 has no transcript either way
+  const s = reg.summarise(evs, { days: 14, sessionProjects });
+  assert.deepEqual(s.byProject, { 'tagged-proj': 1, 'derived-proj': 1, '(unknown)': 1 });
+});
+
+test('REGISTER: filterByProject shares projectOf\'s precedence, so --project scopes the WHOLE output, not just the session tally', () => {
+  const reg = require('../guards/register');
+  const rec = (sid, tool) => ({
+    resourceLogs: [{
+      resource: { attributes: [] },
+      scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), attributes: [{ key: 'event.name', value: { stringValue: 'tool_result' } }, { key: 'session.id', value: { stringValue: sid } }, { key: 'tool_name', value: { stringValue: tool } }, { key: 'success', value: { stringValue: 'true' } }] }] }],
+    }],
+  });
+  const evs = [...reg.events(rec('s1', 'Bash')), ...reg.events(rec('s2', 'Bash'))];
+  const sessionProjects = new Map([['s1', 'alpha'], ['s2', 'beta']]);
+  const scoped = reg.filterByProject(evs, 'alpha', sessionProjects);
+  assert.equal(scoped.length, 1);
+  assert.equal(reg.summarise(scoped, { days: 14, sessionProjects }).tools.total, 1, 'a project filter scopes tool counts, not only the session count');
+  assert.deepEqual(reg.filterByProject(evs, null, sessionProjects), evs, 'no filter is a no-op');
+});
+
+test('REGISTER: parseArgs reads --days and --project in both "--k=v" and "--k v" form', () => {
+  const reg = require('../guards/register');
+  assert.deepEqual(reg.parseArgs(['--days=30']), { days: 30, project: undefined, json: false });
+  assert.deepEqual(reg.parseArgs(['--days', '7', '--project', 'domybest']), { days: 7, project: 'domybest', json: false });
+  assert.deepEqual(reg.parseArgs([]), { days: 14, project: undefined, json: false });
+  assert.equal(reg.parseArgs(['--json']).json, true);
+});
+
+test('REWORK: classifies Agent spawns by NAME PATTERN (not a hardcoded list) and rolls them up per session', () => {
+  const rw = require('../lib/rework');
+  const spawn = (sid, subagentType) => ({ name: 'tool_result', ts: Date.now(), attrs: { 'session.id': sid, tool_name: 'Agent', tool_parameters: JSON.stringify({ subagent_type: subagentType }) }, resource: {} });
+  const evs = [spawn('s1', 'adversarial-reviewer'), spawn('s1', 'adversarial-reviewer'), spawn('s1', 'executor-feature'), spawn('s2', 'executor-bugfix'), spawn('s2', 'general-purpose')];
+  const r = rw.compute(evs, { days: 14 });
+  assert.equal(r.sessionsWithSpawns, 2);
+  assert.equal(r.sessionsWithMultiReview, 1, 's1 spawned a reviewer-like agent twice');
+  assert.equal(r.reviewSpawns, 2);
+  assert.equal(r.executorSpawns, 2, 'executor-feature (s1) + executor-bugfix (s2) — "bugfix" does not steal the executor match');
+  assert.equal(r.reviewPerExecutor, 1);
+  assert.match(rw.render(r), /sessions with >=2 review rounds: 1/);
+});
+
+test('REWORK: an empty window renders plainly, with no divide-by-zero', () => {
+  const rw = require('../lib/rework');
+  const r = rw.compute([], { days: 14 });
+  assert.equal(r.sessionsWithSpawns, 0);
+  assert.equal(r.reviewPerExecutor, null);
+  assert.match(rw.render(r), /no Agent-tool spawns/);
+});
+
+test('GROUND: a grounded claim passes; a fabricated quote, a missing file, and a claim with no evidence all fail', () => {
+  const { ground } = require('../lib/ground');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  fs.writeFileSync(path.join(dir, 'src.js'), 'line one\nconst x = 42;\nline three\n');
+  const plan = {
+    claims: [
+      { claim: 'x is 42', evidence: [{ file: 'src.js', line: 2, quote: 'const x = 42;' }] },
+      { claim: 'fabricated', evidence: [{ file: 'src.js', quote: 'this text does not exist anywhere' }] },
+      { claim: 'no evidence', evidence: [] },
+      { claim: 'missing file', evidence: [{ file: 'nope.js', quote: 'anything' }] },
+    ],
+  };
+  const r = ground(plan, { root: dir });
+  assert.equal(r.total, 4);
+  assert.equal(r.grounded, 1);
+  assert.equal(r.failed, 3);
+  assert.equal(r.failures.length, 3, 'one line per failing claim');
+  assert.ok(r.failures.some((f) => f.includes('fabricated') && f.includes('src.js')));
+  assert.ok(r.failures.some((f) => f.includes('no evidence')));
+  assert.ok(r.failures.some((f) => f.includes('nope.js') && f.includes('not found')));
+  assert.equal(r.summary, 'ground: 4 claims, 1 grounded, 3 failed');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('GROUND: the line tolerance is exactly 3 — within it passes, one past it fails', () => {
+  const { ground } = require('../lib/ground');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  const body = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join('\n');
+  fs.writeFileSync(path.join(dir, 'far.js'), `${body}\nconst target = 1;\n`); // "const target" lands on line 21
+  assert.equal(ground({ claims: [{ claim: 'near', evidence: [{ file: 'far.js', line: 24, quote: 'const target = 1;' }] }] }, { root: dir }).failed, 0, 'line 21 is exactly 3 from claimed line 24');
+  assert.equal(ground({ claims: [{ claim: 'far', evidence: [{ file: 'far.js', line: 25, quote: 'const target = 1;' }] }] }, { root: dir }).failed, 1, 'line 21 is 4 from claimed line 25');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('GROUND: the simple-plan shape (top-level evidence[], no claims[]) is accepted', () => {
+  const { ground } = require('../lib/ground');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  fs.writeFileSync(path.join(dir, 'src.js'), 'const ok = true;\n');
+  const r = ground({ evidence: [{ file: 'src.js', quote: 'const ok = true;' }] }, { root: dir });
+  assert.equal(r.total, 1);
+  assert.equal(r.grounded, 1);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('GROUND: as the CLI runs it — exit 0 when every claim grounds, exit 1 with FAIL lines otherwise', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-ground-'));
+  fs.writeFileSync(path.join(dir, 'a.js'), 'const ok = true;\n');
+  fs.writeFileSync(path.join(dir, 'good.json'), JSON.stringify({ claims: [{ claim: 'ok', evidence: [{ file: 'a.js', quote: 'const ok = true;' }] }] }));
+  fs.writeFileSync(path.join(dir, 'bad.json'), JSON.stringify({ claims: [{ claim: 'nope', evidence: [{ file: 'a.js', quote: 'fabricated' }] }] }));
+  const run = (plan) => spawnSync(process.execPath, [path.join(HERE, 'lib', 'ground.js'), plan, '--root', dir], { encoding: 'utf8' });
+  const good = run(path.join(dir, 'good.json'));
+  assert.equal(good.status, 0, good.stdout + good.stderr);
+  assert.match(good.stdout, /ground: 1 claims, 1 grounded, 0 failed/);
+  const bad = run(path.join(dir, 'bad.json'));
+  assert.equal(bad.status, 1);
+  assert.match(bad.stdout, /FAIL/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
