@@ -287,7 +287,7 @@ test('REGISTER: parses the collector file-exporter shape and summarises what a r
   // (`user_prompt`), `body` carries the prefixed form. The first fixture mirrored the docs instead
   // and the reader silently counted nothing — a test that agrees with its author proves nothing.
   const line = (name, extra) => ({
-    resourceLogs: [{ resource: { attributes: [{ key: 'project', value: { stringValue: 'domybest' } }] }, scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), body: { stringValue: `claude_code.${name}` }, attributes: [{ key: 'event.name', value: { stringValue: name } }, { key: 'session.id', value: { stringValue: 's1' } }, ...Object.entries(extra).map(([k, v]) => ({ key: k, value: typeof v === 'number' ? { intValue: String(v) } : { stringValue: String(v) } }))] }] }] }],
+    resourceLogs: [{ resource: { attributes: [{ key: 'project', value: { stringValue: 'myapp' } }] }, scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), body: { stringValue: `claude_code.${name}` }, attributes: [{ key: 'event.name', value: { stringValue: name } }, { key: 'session.id', value: { stringValue: 's1' } }, ...Object.entries(extra).map(([k, v]) => ({ key: k, value: typeof v === 'number' ? { intValue: String(v) } : { stringValue: String(v) } }))] }] }] }],
   });
   const evs = [
     ...reg.events(line('tool_result', { tool_name: 'Bash', success: 'true', duration_ms: 120 })),
@@ -298,7 +298,7 @@ test('REGISTER: parses the collector file-exporter shape and summarises what a r
   ];
   const s = reg.summarise(evs, { days: 14 });
   assert.equal(s.sessions, 1);
-  assert.deepEqual(s.byProject, { domybest: 1 });
+  assert.deepEqual(s.byProject, { myapp: 1 });
   assert.equal(s.tools.total, 2);
   assert.equal(s.tools.failed, 1);
   assert.equal(s.tools.failedByName.Bash, 1);
