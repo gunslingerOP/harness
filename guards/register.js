@@ -164,11 +164,23 @@ function load(dir = DEFAULT_DIR) {
   return out;
 }
 
-function render(sum) {
+/** `by project:` — unlike the other `top()` lines below, never truncated: finer attribution
+ *  (resource tag / literal attribute / transcript-derived, see docs/register.md) can turn a
+ *  handful of buckets into a dozen, and a correctly-attributed project with few sessions is
+ *  exactly the one a top-5 cutoff would hide. When `project` (the active `--project` filter) is
+ *  given, its row is always present — at 0 if the window filtered it down to nothing — so scoping
+ *  to a project never silently prints "—". */
+function byProjectLine(byProject, project) {
+  const entries = Object.entries(byProject);
+  if (project && !(project in byProject)) entries.push([project, 0]);
+  return entries.sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' · ') || '—';
+}
+
+function render(sum, { project } = {}) {
   const top = (o, n = 5) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} ${v}`).join(' · ') || '—';
   return [
     `REGISTER — last ${sum.days} days`,
-    `  sessions       ${sum.sessions}   by project: ${top(sum.byProject)}`,
+    `  sessions       ${sum.sessions}   by project: ${byProjectLine(sum.byProject, project)}`,
     `  prompts        ${sum.prompts}`,
     `  tool calls     ${sum.tools.total}   failed ${sum.tools.failed}   median ${sum.tools.medianMs}ms`,
     `  failures by    ${top(sum.tools.failedByName)}`,
@@ -192,7 +204,7 @@ function main() {
   const sum = summarise(evs, { days, sessionProjects });
   const rework = require('../lib/rework');
   const rw = rework.compute(evs, { days });
-  console.log(json ? JSON.stringify({ ...sum, rework: rw }, null, 2) : `${render(sum)}\n${rework.render(rw)}`);
+  console.log(json ? JSON.stringify({ ...sum, rework: rw }, null, 2) : `${render(sum, { project })}\n${rework.render(rw)}`);
 }
 
 module.exports = { attrs, events, summarise, load, render, projectOf, filterByProject, parseArgs, DEFAULT_DIR };

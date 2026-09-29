@@ -480,6 +480,35 @@ test('REGISTER: parseArgs reads --days and --project in both "--k=v" and "--k v"
   assert.equal(reg.parseArgs(['--json']).json, true);
 });
 
+test('REGISTER: render never truncates "by project:" — with more than five projects, the lowest-count one still shows', () => {
+  const reg = require('../guards/register');
+  const rec = (sid, project) => ({
+    resourceLogs: [{
+      resource: { attributes: [{ key: 'project', value: { stringValue: project } }] },
+      scopeLogs: [{ logRecords: [{ timeUnixNano: String(Date.now() * 1e6), attributes: [{ key: 'event.name', value: { stringValue: 'user_prompt' } }, { key: 'session.id', value: { stringValue: sid } }] }] }],
+    }],
+  });
+  // Seven projects with two sessions each outrank an eighth with one — exactly the shape that
+  // squeezed a correctly-attributed, low-volume project off a top-5 line.
+  const heavy = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf'];
+  const evs = [];
+  let n = 0;
+  for (const p of heavy) { evs.push(...reg.events(rec(`s${n++}`, p))); evs.push(...reg.events(rec(`s${n++}`, p))); }
+  evs.push(...reg.events(rec(`s${n++}`, 'myapp')));
+  const s = reg.summarise(evs, { days: 14 });
+  assert.equal(Object.keys(s.byProject).length, 8, 'sanity: eight distinct projects in this window');
+  const out = reg.render(s);
+  assert.match(out, /myapp 1/, 'the 8th, lowest-count project must not be truncated off the by-project line');
+  for (const p of heavy) assert.match(out, new RegExp(`\\b${p} 2\\b`));
+});
+
+test('REGISTER: render always shows the --project-scoped row, even when that project has zero sessions in the window', () => {
+  const reg = require('../guards/register');
+  const empty = { days: 14, sessions: 0, byProject: {}, prompts: 0, tools: { total: 0, failed: 0, medianMs: 0, byName: {}, failedByName: {} }, guard: { denied: 0, byTool: {} }, api: { requests: 0, errors: 0, cost: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } }, byAgent: {} };
+  assert.match(reg.render(empty, { project: 'myapp' }), /by project: myapp 0/, 'a --project filter that matched nothing this window still names the project, not just "—"');
+  assert.match(reg.render(empty), /by project: —/, 'with no --project filter and nothing in the window, the line stays empty');
+});
+
 test('REWORK: classifies Agent spawns by NAME PATTERN (not a hardcoded list) and rolls them up per session', () => {
   const rw = require('../lib/rework');
   const spawn = (sid, subagentType) => ({ name: 'tool_result', ts: Date.now(), attrs: { 'session.id': sid, tool_name: 'Agent', tool_parameters: JSON.stringify({ subagent_type: subagentType }) }, resource: {} });
