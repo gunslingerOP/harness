@@ -428,6 +428,20 @@ test('SESSION: projectFromSlug derives a best-effort label — home-prefix strip
   assert.equal(ses.projectFromSlug('-Users-x', '/Users/x'), '(home)', 'a session run in $HOME itself gets a stable placeholder, never empty');
 });
 
+test('SESSION: projectFromSlug folds a dot-directory session directly under $HOME (~/.claude, ~/.config, …) into the (home) placeholder, not a fake project named after the dot-dir', () => {
+  const ses = require('../lib/session');
+  assert.equal(ses.projectFromSlug('-Users-dev--claude', '/Users/dev'), '(home)', '~/.claude itself — the "/" then "." both slugify to "-", giving "-claude", not a project');
+  assert.equal(ses.projectFromSlug('-Users-dev--config', '/Users/dev'), '(home)', 'any dot-directory directly under $HOME, not just .claude specifically');
+  assert.equal(ses.projectFromSlug('-Users-dev-widgets', '/Users/dev'), 'widgets', 'a normal project one level under $HOME is unaffected');
+});
+
+test('SESSION: projectFromSlug folds a Claude Code scratchpad cwd (/private/tmp/claude-<uid>/… or /tmp/claude-<uid>/…) into the embedded project, not the scratchpad\'s own machine-specific prefix', () => {
+  const ses = require('../lib/session');
+  assert.equal(ses.projectFromSlug('-private-tmp-claude-777--Users-dev-widgets', '/Users/dev'), 'widgets', 'the embedded, already-slugified project path is what matters, not the scratchpad root');
+  assert.equal(ses.projectFromSlug('-tmp-claude-1000--Users-dev-widgets', '/Users/dev'), 'widgets', 'both the uid and the "private/" segment are generic — not hard-coded to one machine\'s 502');
+  assert.equal(ses.projectFromSlug('-private-tmp-claude-777--Users-dev-work-sub-project', '/Users/dev'), 'work-sub-project', 'a nested project path folds the same way');
+});
+
 test('SESSION: projectIndex maps every transcript id under root to its derived project label', () => {
   const ses = require('../lib/session');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-projects-'));
